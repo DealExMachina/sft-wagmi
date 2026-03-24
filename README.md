@@ -1,80 +1,122 @@
-# sft-wagmi
+<p align="center">
+  <strong>sft-wagmi</strong><br>
+  Supervised fine-tuning pipeline for <a href="https://dealexmachina.com">Deal ex Machina</a>'s AI watchdog
+</p>
 
-Supervised fine-tuning of **Qwen/Qwen2.5-1.5B-Instruct** on Deal ex Machina site content.  
-Produces **Wagmi** — a grounded assistant that answers questions about the company, its blog, and its services, in French and English.
+<p align="center">
+  <a href="https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct"><img src="https://img.shields.io/badge/Base_Model-Qwen_2.5_1.5B-blue?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==" alt="Qwen 2.5"></a>
+  <a href="https://github.com/unslothai/unsloth"><img src="https://img.shields.io/badge/Training-Unsloth-orange?logo=github" alt="Unsloth"></a>
+  <a href="https://huggingface.co/jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"><img src="https://img.shields.io/badge/HuggingFace-Adapter-yellow?logo=huggingface" alt="HuggingFace"></a>
+  <a href="https://ollama.com"><img src="https://img.shields.io/badge/Inference-Ollama-black?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiIGZpbGw9IndoaXRlIi8+PC9zdmc+" alt="Ollama"></a>
+  <a href="https://openai.com"><img src="https://img.shields.io/badge/Judge-GPT--4o-412991?logo=openai&logoColor=white" alt="GPT-4o"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-green" alt="License"></a>
+</p>
+
+---
+
+Fine-tune [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) into **Wagmi** -- a small model (986 MB quantized) that runs on CPU and answers questions about [Deal ex Machina](https://dealexmachina.com), its services, its blog, and its founder. In French and English, with guardrails against hallucination.
+
+The pipeline has three layers:
+
+1. **RAG** -- BM25-style local retrieval injects verified facts into the system prompt at inference time ([`local-rag.ts`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/local-rag.ts))
+2. **SFT** -- 568 bilingual training examples generated from site content teach identity, tone, uncertainty, and refusal reflexes
+3. **Autotune** -- iterative judge-correct-retrain loop with GPT-4o scoring on 6 criteria until convergence
 
 ## Dataset
 
-| Split | Examples |
-|-------|----------|
-| train | 374      |
-| eval  | 66       |
-| total | 440      |
+| | Train | Eval | Total |
+| --- | --- | --- | --- |
+| Examples | 483 | 85 | **568** |
+| EN | 285 | | |
+| FR | 283 | | |
 
-Balanced EN/FR (222 / 218). Mix of:
-- content-grounded summary & citation rows (blog posts + wagmi-skills + ai.txt)
-- synthetic guardrail examples (identity, uncertainty, refusal, anti-hallucination)
-- direct Q&A (company, services, founder, tech stack)
-- multi-turn dialogues
+Sources: 9 blog posts (bilingual), [`wagmi-skills.md`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/wagmi-skills.md), [`ai.txt`](https://github.com/DealExMachina/dexm-one-page/blob/dev/public/ai.txt).
 
-Generated from [dexm-one-page](https://github.com/jeanbaptdzd/dexm-one-page) via:
+| Category | Count | Description |
+| --- | --- | --- |
+| Content-grounded | 368 | Summaries and citations from chunked site content |
+| Guardrails | 112 | Identity, uncertainty, refusal, anti-hallucination |
+| Direct Q&A | 62 | Company, services, founder, tech stack, contact |
+| Cross-lingual | 54 | FR prompt frames on EN-only sources |
+| Hard negatives | 18 | Corrections of observed v1 hallucinations |
+| Multi-turn | 8 | Dialogue coherence across turns |
+
+Generated from [dexm-one-page](https://github.com/DealExMachina/dexm-one-page) via:
 
 ```bash
 npx tsx scripts/generate-wagmi-sft-dataset.ts
 ```
 
-## Model config
+## Training
 
-| Parameter         | Value                          |
-|-------------------|--------------------------------|
-| Base model        | Qwen/Qwen2.5-1.5B-Instruct     |
-| LoRA rank         | 32                             |
-| LoRA alpha        | 64                             |
-| Target modules    | q/k/v/o + gate/up/down proj    |
-| Max seq length    | 2048                           |
-| Learning rate     | 2e-4                           |
-| Scheduler         | cosine                         |
-| Epochs            | 2                              |
-| Batch size        | 8 per device, grad accum 2     |
-| Effective batch   | 16                             |
-| Precision         | bf16 (no quantisation)         |
-| Infra             | HuggingFace L40 (48 GB VRAM)   |
+| Parameter | Value |
+| --- | --- |
+| Base model | [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) |
+| Method | LoRA (rank 32, alpha 64) |
+| Target modules | q/k/v/o + gate/up/down proj |
+| Max seq length | 2048 tokens |
+| Learning rate | 2e-4 (cosine decay) |
+| Epochs | 2 |
+| Effective batch | 16 (4 per device, grad accum 4) |
+| Precision | bf16 |
+| Framework | [Unsloth](https://github.com/unslothai/unsloth) + [TRL](https://github.com/huggingface/trl) |
+| Infrastructure | HuggingFace L40 (48 GB VRAM) |
 
-## Usage
-
-### 1. Set up the environment
+### Run training
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure
+Set `HF_TOKEN` in environment, then execute `train.ipynb` top-to-bottom on a CUDA host (HF Spaces Gradio, Colab, or bare metal).
 
-Open `train.ipynb` and adjust the variables at the top of **Cell 2**:
+The adapter is pushed to [`jeanbaptdzd/wagmi-qwen2.5-1.5b-sft`](https://huggingface.co/jeanbaptdzd/wagmi-qwen2.5-1.5b-sft) on the Hub.
 
-- `HUB_MODEL_ID` — your HuggingFace model repo (e.g. `yourname/wagmi-qwen2.5-1.5b-sft`)
-- `PUSH_TO_HUB` — set to `True` to push the adapter automatically
-- Set the `HF_TOKEN` environment variable (or run `huggingface-cli login`)
-- Optionally set `WANDB_API_KEY` for W&B logging, or change `report_to` to `"none"`
+## Autotune loop
 
-### 3. Run
-
-On HuggingFace Spaces (L40) or any CUDA host:
+`autotune.ipynb` runs a Karpathy-style self-improvement loop:
 
 ```
-jupyter nbconvert --to notebook --execute train.ipynb --output train_executed.ipynb
+[SFT model] --> inference on 50+ eval prompts (with RAG context)
+     |
+     v
+[GPT-4o judge] --> scores on 6 criteria (0-3 each)
+     |              factual_accuracy, language_match, tone_persona,
+     |              guardrail_compliance, conciseness, hallucination_free
+     v
+[GPT-4o corrector] --> ideal responses for failures (total < 14/18)
+     |
+     v
+[Merge corrections] --> retrain with Unsloth --> push to Hub
+     |
+     v
+[Repeat] --> until mean score > 2.5/3.0 or 3 iterations
 ```
 
-Or open the notebook interactively and run top-to-bottom.
+Requires `OPENAI_API_KEY` and `HF_TOKEN` in environment.
 
-### 4. Output
+## Export to Ollama
 
-- Local adapter: `wagmi-qwen2.5-1.5b-sft/`
-- HF Hub: `https://huggingface.co/<HUB_MODEL_ID>` (private by default)
+After training, the LoRA adapter lives on the Hub. One local script handles the full export:
+
+```bash
+pip install torch transformers peft huggingface_hub
+HF_TOKEN=hf_xxx python3.11 scripts/export_ollama.py
+```
+
+Pipeline: download adapter --> merge LoRA into base on CPU (~6 GB RAM) --> convert to GGUF via [llama.cpp](https://github.com/ggerganov/llama.cpp) --> quantize Q4_K_M --> create Ollama model with ChatML template.
+
+Requires [Ollama](https://ollama.com) >= 0.5 and `brew install llama.cpp`.
+
+```bash
+ollama run wagmi-sft
+```
+
+Final model: **986 MB** (Q4_K_M), runs on any CPU.
 
 ## Regenerating the dataset
 
-When site content changes, regenerate from `dexm-one-page` and recopy:
+When site content changes:
 
 ```bash
 cd ../dexm-one-page
@@ -83,57 +125,41 @@ cp datasets/wagmi-sft/*.jsonl ../sft-wagmi/data/
 cp datasets/wagmi-sft/metadata.json ../sft-wagmi/data/
 ```
 
-## Autotune loop (Karpathy-style self-improvement)
-
-`autotune.ipynb` runs an iterative improvement loop:
-
-1. Inference on 50+ eval prompts (with RAG context)
-2. Claude judge scores each response (6 criteria, 0-3 scale)
-3. Claude corrector generates ideal responses for failures
-4. Corrections merged into training set
-5. Retrain with Unsloth, push to Hub
-6. Repeat until convergence (mean score > 2.5/3.0 or 3 iterations)
-
-Requires `ANTHROPIC_API_KEY` and `HF_TOKEN` in environment. Optionally set `WAGMI_SKILLS_PATH` to the `wagmi-skills.md` file (defaults to `../dexm-one-page/src/lib/chat/wagmi-skills.md`).
-
-Outputs per iteration:
-- `eval_scores_iterN.json` -- judge scores
-- `corrections_iterN.jsonl` -- corrected SFT rows
-- `data/train_iterN.jsonl` -- merged training set
-- `autotune_history.json` -- convergence tracking
-
-## Export to Ollama (local deployment)
-
-After training on HF Spaces, the LoRA adapter is pushed to the Hub.
-The GGUF export step of the Space may fail (interactive `apt-get` prompt) -- this is expected and safe to ignore.
-
-To import the model into Ollama locally, run one script that handles everything (download adapter, merge on CPU, create Ollama model):
-
-```bash
-pip install torch transformers peft huggingface_hub
-HF_TOKEN=hf_xxx python scripts/export_ollama.py
-```
-
-This merges the LoRA adapter into the base Qwen model on CPU (~6 GB RAM, takes 2-3 min), then creates the Ollama model with the right parameters.
-
-Requires [Ollama](https://ollama.com) >= 0.5.
-
-Once done: `ollama run wagmi-sft`
-
 ## Repository structure
 
 ```
 sft-wagmi/
 ├── data/
-│   ├── train.jsonl           # training examples
-│   ├── eval.jsonl            # evaluation examples
-│   └── metadata.json         # generation stats
+│   ├── train.jsonl              # 483 training examples (JSONL chat format)
+│   ├── eval.jsonl               # 85 evaluation examples
+│   └── metadata.json            # generation stats and distribution
 ├── scripts/
-│   └── export_ollama.py      # Download adapter, merge on CPU, create Ollama model
-├── train.ipynb               # Unsloth SFT notebook
-├── baseline.ipynb            # Pre-training baseline eval
-├── autotune.ipynb            # Autotune loop (judge + correct + retrain)
-├── autotune_history.json     # Convergence tracking (generated)
-├── requirements.txt          # Python dependencies
+│   └── export_ollama.py         # merge + GGUF convert + Ollama import
+├── train.ipynb                  # Unsloth SFT notebook
+├── baseline.ipynb               # pre-training baseline evaluation
+├── autotune.ipynb               # judge-correct-retrain loop
+├── requirements.txt             # Python dependencies
 └── README.md
 ```
+
+## Attribution
+
+| Component | License | Link |
+| --- | --- | --- |
+| Qwen2.5-1.5B-Instruct | Apache 2.0 | [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) |
+| Unsloth | Apache 2.0 | [unslothai/unsloth](https://github.com/unslothai/unsloth) |
+| TRL | Apache 2.0 | [huggingface/trl](https://github.com/huggingface/trl) |
+| llama.cpp | MIT | [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) |
+| Ollama | MIT | [ollama/ollama](https://github.com/ollama/ollama) |
+| GPT-4o (judge) | Proprietary | [OpenAI](https://openai.com) |
+
+The LoRA adapter and SFT dataset are original work by [Deal ex Machina](https://dealexmachina.com). The base model architecture and weights remain the intellectual property of the Qwen team at Alibaba Cloud.
+
+## Related
+
+- [dexm-one-page](https://github.com/DealExMachina/dexm-one-page) -- the website that serves Wagmi
+- [Blog post: Dresser un petit modele sur CPU](https://dealexmachina.com/blog/dresser-petit-modele-cpu) -- full write-up of this pipeline (FR)
+
+---
+
+<sub>Built with [Cursor](https://cursor.com) by [Deal ex Machina](https://dealexmachina.com) -- *The optimal path between vision and results.*</sub>
