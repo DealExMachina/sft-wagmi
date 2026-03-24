@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-03-24T13:37:02.136Z",
+  "output": {
+    "train": "datasets/wagmi-sft/train.jsonl",
+    "eval": "datasets/wagmi-sft/eval.jsonl"
+  },
+  "counts": {
+    "total": 568,
+    "train": 483,
+    "eval": 85,
+    "sources": 11,
+    "blogSources": 9,
+    "extraSources": 2
+  },
+  "distribution": {
+    "byLocale": {
+      "en": 285,
+      "fr": 283
+    },
+    "byTag": {
+      "summary": 184,
+      "grounded": 436,
+      "site-content": 368,
+      "citation": 184,
+      "refusal": 32,
+      "out-of-scope": 32,
+      "guardrail": 120,
+      "cross-lingual": 54,
+      "auth-nudge": 6,
+      "unauth": 6,
+      "qa": 62,
+      "approach": 4,
+      "partners": 2,
+      "anti-hallucination": 24,
+      "tech-stack": 22,
+      "identity": 32,
+      "hard-negative": 18,
+      "uncertainty": 36,
+      "founder": 8,
+      "multi-turn": 8,
+      "blog": 6,
+      "company": 10,
+      "contact": 10,
+      "services": 6,
+      "compliance": 2
+    },
+    "bySourceType": {
+      "content": 368,
+      "synthetic:guardrail": 112,
+      "synthetic:wagmi-qa": 28,
+      "synthetic:grounded-qa": 34,
+      "synthetic:hard-negative": 18,
+      "synthetic:multi-turn": 8
+    }
+  },
+  "notes": [
+    "Dataset is grounded in repository content (blog + wagmi-skills + ai.txt).",
+    "Rows use chat-format messages for Unsloth SFT ingestion.",
+    "Includes identity, anti-hallucination, uncertainty, refusal, and auth-nudge guardrail examples.",
+    "Includes multi-turn conversations for dialogue coherence.",
+    "Includes direct Q&A examples (no excerpt) for knowledge recall.",
+    "Target model: Qwen 2.5 1.5B-Instruct. Target infra: HuggingFace L40."
+  ]
+}

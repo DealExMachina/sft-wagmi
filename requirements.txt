@@ -1,0 +1,27 @@
+# Unsloth SFT — Wagmi / Qwen2.5-1.5B-Instruct
+# Install on a CUDA 12.4 + PyTorch 2.6 host (e.g. HuggingFace L40 Space)
+# Run: pip install -r requirements.txt
+
+# Core Unsloth wheel — picks the right CUDA variant automatically
+unsloth @ git+https://github.com/unslothai/unsloth.git
+
+# Training stack
+torch>=2.5.0
+trl>=0.12.0
+transformers>=4.47.0
+datasets>=3.0.0
+peft>=0.14.0
+bitsandbytes>=0.45.0
+accelerate>=0.34.0
+
+# Hub + logging
+huggingface_hub>=0.26.0
+wandb>=0.19.0
+
+# Autotune judge (OpenAI GPT-4o)
+openai>=1.0.0
+
+# Utilities
+sentencepiece>=0.2.0
+protobuf>=4.25.0
+packaging>=24.0

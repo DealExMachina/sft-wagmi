@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+.cache/
+*.gguf
+wagmi-qwen2.5-1.5b-sft*/
+.claude/
