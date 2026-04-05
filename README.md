@@ -1,3 +1,9 @@
+---
+title: sft-wagmi
+sdk: docker
+app_port: 7860
+---
+
 <p align="center">
   <strong>sft-wagmi</strong><br>
   Supervised fine-tuning pipeline for <a href="https://dealexmachina.com">Deal ex Machina</a>'s AI watchdog
@@ -14,44 +20,64 @@
 
 ---
 
-Fine-tune [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) into **Wagmi** -- a small model (986 MB quantized) that runs on CPU and answers questions about [Deal ex Machina](https://dealexmachina.com), its services, its blog, and its founder. In French and English, with guardrails against hallucination.
+Fine-tune [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) into **Wagmi**: a small quantized model that runs on CPU and answers questions about [Deal ex Machina](https://dealexmachina.com), its services, blog, and founder, in French and English, with guardrails against hallucination.
 
-The pipeline has three layers:
+The stack has three layers:
 
-1. **RAG** -- BM25-style local retrieval injects verified facts into the system prompt at inference time ([`local-rag.ts`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/local-rag.ts))
-2. **SFT** -- 568 bilingual training examples generated from site content teach identity, tone, uncertainty, and refusal reflexes
-3. **Autotune** -- iterative judge-correct-retrain loop with GPT-4o scoring on 6 criteria until convergence
+1. **RAG** — BM25-style local retrieval injects verified facts into the system prompt at inference time in the site ([`local-rag.ts`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/local-rag.ts)).
+2. **SFT** — JSONL chat examples generated from repo content (see below); identity, tone, uncertainty, and refusal reflexes.
+3. **Autotune** — iterative judge–correct–retrain loop with GPT-4o scoring on six criteria until convergence (small profile only).
 
-## Dataset
+**Dataset snapshot** (from `data/metadata.json` after sync; regenerate to refresh):
 
 | | Train | Eval | Total |
 | --- | --- | --- | --- |
-| Examples | 483 | 85 | **568** |
-| EN | 285 | | |
-| FR | 283 | | |
+| Examples | 663 | 117 | **780** |
+| EN | 347 | | |
+| FR | 433 | | |
 
-Sources: 9 blog posts (bilingual), [`wagmi-skills.md`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/wagmi-skills.md), [`ai.txt`](https://github.com/DealExMachina/dexm-one-page/blob/dev/public/ai.txt).
+Source mix (same generation run, `bySourceType`):
 
-| Category | Count | Description |
-| --- | --- | --- |
-| Content-grounded | 368 | Summaries and citations from chunked site content |
-| Guardrails | 112 | Identity, uncertainty, refusal, anti-hallucination |
-| Direct Q&A | 62 | Company, services, founder, tech stack, contact |
-| Cross-lingual | 54 | FR prompt frames on EN-only sources |
-| Hard negatives | 18 | Corrections of observed v1 hallucinations |
-| Multi-turn | 8 | Dialogue coherence across turns |
+| Type | Rows | Role |
+| --- | ---: | --- |
+| `content` | 440 | Chunked blog + site markdown |
+| `obsidian` | 140 | Optional vault notes (`wagmi_sft` / `sft` frontmatter, `OBSIDIAN_VAULT_PATH` in dexm) |
+| `synthetic:guardrail` | 112 | Identity, refusal, uncertainty, auth nudges |
+| `synthetic:grounded-qa` | 34 | Grounded Q&A |
+| `synthetic:wagmi-qa` | 28 | Direct Wagmi / company Q&A |
+| `synthetic:hard-negative` | 18 | Corrections of known bad patterns |
+| `synthetic:multi-turn` | 8 | Multi-turn coherence |
 
-Generated from [dexm-one-page](https://github.com/DealExMachina/dexm-one-page) via:
+Underlying content includes [`wagmi-skills.md`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/wagmi-skills.md), [`ai.txt`](https://github.com/DealExMachina/dexm-one-page/blob/dev/public/ai.txt), bilingual blog posts, and optional Obsidian. **Authoritative counts** after each generation live in `dexm-one-page/datasets/wagmi-sft/metadata.json`.
+
+## Regenerating and syncing the dataset
+
+From **dexm-one-page** (sibling repo):
 
 ```bash
-npx tsx scripts/generate-wagmi-sft-dataset.ts
+cd ../dexm-one-page
+npm run dataset:wagmi:refresh   # generate JSONL + copy to ../sft-wagmi/data
 ```
+
+Or only copy already-generated files:
+
+```bash
+npm run dataset:wagmi:sync
+```
+
+Or from **this repo**:
+
+```bash
+python3 scripts/pipeline.py --sync-dataset
+```
+
+That runs `npm run dataset:wagmi:refresh` in `../dexm-one-page` when that path exists.
 
 ## Training
 
 | Parameter | Value |
 | --- | --- |
-| Base model | [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) |
+| Base model (small profile) | [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) |
 | Method | LoRA (rank 32, alpha 64) |
 | Target modules | q/k/v/o + gate/up/down proj |
 | Max seq length | 2048 tokens |
@@ -60,7 +86,7 @@ npx tsx scripts/generate-wagmi-sft-dataset.ts
 | Effective batch | 16 (4 per device, grad accum 4) |
 | Precision | bf16 |
 | Framework | [Unsloth](https://github.com/unslothai/unsloth) + [TRL](https://github.com/huggingface/trl) |
-| Infrastructure | HuggingFace L40 (48 GB VRAM) |
+| Typical GPU | Hugging Face L40-class (48 GB VRAM) |
 
 ### Run training
 
@@ -68,16 +94,19 @@ npx tsx scripts/generate-wagmi-sft-dataset.ts
 pip install -r requirements.txt
 ```
 
-Set `HF_TOKEN` in environment, then execute `train.ipynb` top-to-bottom on a CUDA host (HF Spaces Gradio, Colab, or bare metal).
+Set `HF_TOKEN`, then either:
 
-The adapter is pushed to [`jeanbaptdzd/wagmi-qwen2.5-1.5b-sft`](https://huggingface.co/jeanbaptdzd/wagmi-qwen2.5-1.5b-sft) on the Hub.
+- Run `train.ipynb` top-to-bottom on a CUDA host, or
+- Run `python3 train.py` (same profile env as the pipeline; see below).
+
+The adapter is pushed to [`jeanbaptdzd/wagmi-qwen2.5-1.5b-sft`](https://huggingface.co/jeanbaptdzd/wagmi-qwen2.5-1.5b-sft) (small profile defaults).
 
 ## Autotune loop
 
-`autotune.ipynb` runs a Karpathy-style self-improvement loop:
+`autotune.ipynb` or `autotune.py` implements the self-improvement loop:
 
 ```
-[SFT model] --> inference on 50+ eval prompts (with RAG context)
+[SFT model] --> inference on eval prompts (with RAG context where configured)
      |
      v
 [GPT-4o judge] --> scores on 6 criteria (0-3 each)
@@ -87,58 +116,90 @@ The adapter is pushed to [`jeanbaptdzd/wagmi-qwen2.5-1.5b-sft`](https://huggingf
 [GPT-4o corrector] --> ideal responses for failures (total < 14/18)
      |
      v
-[Merge corrections] --> retrain with Unsloth --> push to Hub
+[Merge corrections] --> retrain --> push to Hub
      |
      v
 [Repeat] --> until mean score > 2.5/3.0 or 3 iterations
 ```
 
-Requires `OPENAI_API_KEY` and `HF_TOKEN` in environment.
+Requires `OPENAI_API_KEY` and `HF_TOKEN`. **`--profile auth`**: training and export are supported; **autotune is disabled for the auth profile** in `pipeline.py` (small only).
 
-## Export to Ollama
+## Export to Ollama / GGUF
 
-After training, the LoRA adapter lives on the Hub. One local script handles the full export:
+**Primary (pipeline):** `export_gguf.py` merges the LoRA adapter, builds GGUF, and can push to Hub; invoked via:
+
+```bash
+python3 scripts/pipeline.py --export
+# or: python3 export_gguf.py
+```
+
+Profiles: `MODEL_PROFILE=small` (default) or `auth` (Mistral Small 24B path; separate Hub repos — see env defaults in `export_gguf.py`).
+
+**Standalone Mac/Linux helper:** `scripts/export_ollama.py` — download adapter, merge on CPU (~6 GB RAM for 1.5B), convert with [llama.cpp](https://github.com/ggerganov/llama.cpp), quantize Q4_K_M, register with Ollama:
 
 ```bash
 pip install torch transformers peft huggingface_hub
 HF_TOKEN=hf_xxx python3.11 scripts/export_ollama.py
 ```
 
-Pipeline: download adapter --> merge LoRA into base on CPU (~6 GB RAM) --> convert to GGUF via [llama.cpp](https://github.com/ggerganov/llama.cpp) --> quantize Q4_K_M --> create Ollama model with ChatML template.
-
-Requires [Ollama](https://ollama.com) >= 0.5 and `brew install llama.cpp`.
+Needs [Ollama](https://ollama.com) >= 0.5 and `llama.cpp` on PATH (e.g. `brew install llama.cpp`).
 
 ```bash
 ollama run wagmi-sft
 ```
 
-Final model: **986 MB** (Q4_K_M), runs on any CPU.
+Quantized small build is on the order of **~1 GB** (Q4_K_M), CPU-friendly.
 
-## Regenerating the dataset
-
-When site content changes:
+## One-command launcher
 
 ```bash
-cd ../dexm-one-page
-npx tsx scripts/generate-wagmi-sft-dataset.ts
-cp datasets/wagmi-sft/*.jsonl ../sft-wagmi/data/
-cp datasets/wagmi-sft/metadata.json ../sft-wagmi/data/
+python3 scripts/pipeline.py --all
 ```
+
+Useful variants:
+
+```bash
+python3 scripts/pipeline.py --preflight
+python3 scripts/pipeline.py --sync-dataset
+python3 scripts/pipeline.py --profile small --train
+python3 scripts/pipeline.py --profile auth --train
+python3 scripts/pipeline.py --eval
+python3 scripts/pipeline.py --eval-rag
+python3 scripts/pipeline.py --all --dry-run
+```
+
+Behavior:
+
+- **Steps** prefer root Python scripts (`baseline.py`, `train.py`, `autotune.py`, `eval_sft.py`, `eval_sft_rag.py`, `export_gguf.py`). If a script is missing, the launcher **falls back** to the matching `.ipynb` via `jupyter nbconvert --execute` when Jupyter is installed.
+- **`--sync-dataset`** runs `npm run dataset:wagmi:refresh` in `../dexm-one-page`.
+- **`--profile`**: `small` (Qwen 1.5B) or `auth` (Mistral 24B-style path); also `MODEL_PROFILE` env.
+- **`HF_TOKEN`**: Hub pull/push. **`OPENAI_API_KEY`**: autotune judge (and related evals if configured).
+
+**HF Spaces / Gradio:** `app.py` mirrors the same flow in a UI (see Space config in the YAML header above).
 
 ## Repository structure
 
 ```
 sft-wagmi/
 ├── data/
-│   ├── train.jsonl              # 483 training examples (JSONL chat format)
-│   ├── eval.jsonl               # 85 evaluation examples
-│   └── metadata.json            # generation stats and distribution
+│   ├── train.jsonl           # SFT training rows (JSONL chat format)
+│   ├── eval.jsonl            # Held-out eval rows
+│   └── metadata.json         # Counts + distribution (from dexm generator)
 ├── scripts/
-│   └── export_ollama.py         # merge + GGUF convert + Ollama import
-├── train.ipynb                  # Unsloth SFT notebook
-├── baseline.ipynb               # pre-training baseline evaluation
-├── autotune.ipynb               # judge-correct-retrain loop
-├── requirements.txt             # Python dependencies
+│   ├── pipeline.py           # CLI orchestration (sync, train, eval, export)
+│   └── export_ollama.py      # Standalone merge + GGUF + Ollama import
+├── baseline.py               # Baseline eval (script)
+├── train.py                  # Unsloth SFT (script)
+├── autotune.py               # Judge loop (script)
+├── eval_sft.py               # Post-training eval
+├── eval_sft_rag.py           # Eval with RAG-style context
+├── export_gguf.py            # GGUF export + Hub (used by --export)
+├── retrain_step.py           # Helper for autotune merge/retrain
+├── app.py                    # Gradio Space entry
+├── baseline.ipynb            # Notebook alternative for baseline
+├── train.ipynb               # Notebook alternative for training
+├── autotune.ipynb            # Notebook alternative for autotune
+├── requirements.txt
 └── README.md
 ```
 
@@ -153,13 +214,14 @@ sft-wagmi/
 | Ollama | MIT | [ollama/ollama](https://github.com/ollama/ollama) |
 | GPT-4o (judge) | Proprietary | [OpenAI](https://openai.com) |
 
-The LoRA adapter and SFT dataset are original work by [Deal ex Machina](https://dealexmachina.com). The base model architecture and weights remain the intellectual property of the Qwen team at Alibaba Cloud.
+The LoRA adapter and SFT dataset are original work by [Deal ex Machina](https://dealexmachina.com). Base model weights remain the property of the Qwen team (Alibaba Cloud).
 
 ## Related
 
-- [dexm-one-page](https://github.com/DealExMachina/dexm-one-page) -- the website that serves Wagmi
-- [Blog post: Dresser un petit modele sur CPU](https://dealexmachina.com/blog/dresser-petit-modele-cpu) -- full write-up of this pipeline (FR)
+- [dexm-one-page](https://github.com/DealExMachina/dexm-one-page) — production site and `scripts/generate-wagmi-sft-dataset.ts`
+- [Dresser un petit modèle sur CPU](https://dealexmachina.com/fr/blog/dresser-petit-modele-cpu) — long-form write-up (FR)
+- [SFT Wagmi, pipeline rudimentaire](https://dealexmachina.com/fr/blog/2026-04-06-sft-wagmi-rudimentary-pipeline-fr) — pipeline notes (FR)
 
 ---
 
-<sub>Built with [Cursor](https://cursor.com) by [Deal ex Machina](https://dealexmachina.com) -- *The optimal path between vision and results.*</sub>
+<sub>Built with [Cursor](https://cursor.com) by [Deal ex Machina](https://dealexmachina.com) — *The optimal path between vision and results.*</sub>

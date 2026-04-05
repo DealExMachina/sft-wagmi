@@ -1,0 +1,233 @@
+"""Export fine-tuned Wagmi to GGUF for Ollama deployment.
+
+Merges the LoRA adapter into the base model and exports a quantised GGUF file.
+Pushes to HuggingFace Hub and generates an Ollama Modelfile with ChatML template.
+"""
+
+import os
+import traceback
+from pathlib import Path
+
+os.environ["PYTHONUNBUFFERED"] = "1"
+
+import torch
+from huggingface_hub import HfApi, create_repo
+from unsloth import FastLanguageModel
+
+MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
+PROFILE_CONFIG = {
+    "small": {
+        "base_model_id": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
+        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"),
+        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", "output/wagmi-qwen2.5-1.5b-sft"),
+        "hub_gguf_repo": os.environ.get("SMALL_HUB_GGUF_REPO", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft-gguf"),
+        "artifact_prefix": "wagmi-qwen2.5-1.5b-sft",
+    },
+    "auth": {
+        "base_model_id": os.environ.get("AUTH_MODEL_ID", "unsloth/Mistral-Small-3.1-24B-Instruct-2503"),
+        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-mistral-small-3.1-24b-sft"),
+        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-mistral-small-3.1-24b-sft"),
+        "hub_gguf_repo": os.environ.get("AUTH_HUB_GGUF_REPO", "jeanbaptdzd/wagmi-mistral-small-3.1-24b-sft-gguf"),
+        "artifact_prefix": "wagmi-mistral-small-3.1-24b-sft",
+    },
+}
+if MODEL_PROFILE not in PROFILE_CONFIG:
+    raise ValueError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}. Expected one of: {', '.join(PROFILE_CONFIG.keys())}")
+
+cfg = PROFILE_CONFIG[MODEL_PROFILE]
+BASE_MODEL_ID = cfg["base_model_id"]
+HUB_ADAPTER = cfg["hub_adapter"]
+ADAPTER_DIR = cfg["adapter_dir"]
+MAX_SEQ_LEN = 2048
+DTYPE = torch.bfloat16
+
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
+HUB_GGUF_REPO = cfg["hub_gguf_repo"]
+
+GGUF_DIR = Path(f"output/{MODEL_PROFILE}-gguf")
+QUANT = "q4_k_m"
+
+SYSTEM_PROMPT = (
+    "Tu es Wagmi, le watchdog de Deal ex Machina. "
+    "Reponds de maniere factuelle, concise, sans invention. "
+    "Si l'information manque, dis clairement: 'Je ne sais pas avec certitude'."
+)
+
+MODELFILE_TEMPLATES = {
+    "small": '''FROM {gguf_filename}
+
+TEMPLATE """{{{{- if .System }}}}<|im_start|>system
+{{{{ .System }}}}<|im_end|>
+{{{{ end }}}}<|im_start|>user
+{{{{ .Prompt }}}}<|im_end|>
+<|im_start|>assistant
+{{{{ .Response }}}}<|im_end|>
+"""
+
+PARAMETER num_ctx 2048
+PARAMETER num_predict 220
+PARAMETER temperature 0.2
+PARAMETER top_k 30
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.12
+PARAMETER repeat_last_n 128
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+
+SYSTEM """{system_prompt}"""
+''',
+    "auth": '''FROM {gguf_filename}
+
+TEMPLATE """{{{{- if .System }}}}[SYSTEM_PROMPT]{{{{ .System }}}}[/SYSTEM_PROMPT]{{{{ end }}}}[INST]{{{{ .Prompt }}}}[/INST]{{{{ .Response }}}}</s>"""
+
+PARAMETER num_ctx 2048
+PARAMETER num_predict 220
+PARAMETER temperature 0.2
+PARAMETER top_k 30
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.12
+PARAMETER repeat_last_n 128
+PARAMETER stop "</s>"
+PARAMETER stop "[INST]"
+
+SYSTEM """{system_prompt}"""
+''',
+}
+
+
+def run():
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+
+    adapter_path = ADAPTER_DIR if Path(ADAPTER_DIR).exists() else HUB_ADAPTER
+    print(f"\nLoading base model: {BASE_MODEL_ID}")
+    print(f"Loading adapter: {adapter_path}")
+
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=adapter_path,
+        max_seq_length=MAX_SEQ_LEN,
+        dtype=DTYPE,
+        load_in_4bit=False,
+    )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    print(f"Model loaded ({model.num_parameters() / 1e6:.1f}M params)")
+
+    # ── Export GGUF ───────────────────────────────────────────────────────
+    GGUF_DIR.mkdir(parents=True, exist_ok=True)
+
+    print(f"\n{'='*60}")
+    print(f"  Exporting GGUF: {QUANT}")
+    print(f"{'='*60}\n")
+
+    model.save_pretrained_gguf(
+        str(GGUF_DIR),
+        tokenizer,
+        quantization_method=QUANT,
+    )
+
+    # Find all produced GGUF files (Unsloth naming varies by version)
+    gguf_files = sorted(GGUF_DIR.glob("*.gguf"))
+    if not gguf_files:
+        print("ERROR: No GGUF files produced!")
+        return
+
+    print(f"\nGGUF files produced:")
+    for f in gguf_files:
+        print(f"  {f.name} ({f.stat().st_size / 1e6:.0f} MB)")
+
+    # Use the first (and likely only) GGUF file
+    gguf_file = gguf_files[0]
+    target_name = f"{cfg['artifact_prefix']}.{QUANT}.gguf"
+    target_path = GGUF_DIR / target_name
+
+    if gguf_file.name != target_name:
+        if target_path.exists():
+            target_path.unlink()
+        gguf_file.rename(target_path)
+        print(f"  Renamed {gguf_file.name} -> {target_name}")
+    print(f"  Final: {target_name} ({target_path.stat().st_size / 1e6:.0f} MB)")
+
+    # ── Generate Modelfile ────────────────────────────────────────────────
+    modelfile_content = MODELFILE_TEMPLATES[MODEL_PROFILE].format(
+        gguf_filename=target_name, system_prompt=SYSTEM_PROMPT,
+    )
+    modelfile_path = GGUF_DIR / "Modelfile.wagmi-sft"
+    modelfile_path.write_text(modelfile_content)
+    print(f"\nModelfile written to {modelfile_path}")
+
+    # ── Push to Hub ───────────────────────────────────────────────────────
+    if HF_TOKEN:
+        print(f"\nPushing to {HUB_GGUF_REPO} ...")
+        try:
+            create_repo(HUB_GGUF_REPO, token=HF_TOKEN, private=True, repo_type="model", exist_ok=True)
+            print(f"  Repo ready: {HUB_GGUF_REPO}")
+        except Exception as e:
+            print(f"  WARNING: create_repo failed: {e}")
+            traceback.print_exc()
+
+        api = HfApi(token=HF_TOKEN)
+
+        # Upload GGUF
+        try:
+            print(f"  Uploading {target_name} ({target_path.stat().st_size / 1e6:.0f} MB) ...")
+            api.upload_file(
+                path_or_fileobj=str(target_path),
+                path_in_repo=target_name,
+                repo_id=HUB_GGUF_REPO,
+                repo_type="model",
+            )
+            print(f"  GGUF uploaded.")
+        except Exception as e:
+            print(f"  ERROR uploading GGUF: {e}")
+            traceback.print_exc()
+
+        # Upload Modelfile
+        try:
+            api.upload_file(
+                path_or_fileobj=str(modelfile_path),
+                path_in_repo="Modelfile.wagmi-sft",
+                repo_id=HUB_GGUF_REPO,
+                repo_type="model",
+            )
+            print(f"  Modelfile uploaded.")
+        except Exception as e:
+            print(f"  ERROR uploading Modelfile: {e}")
+            traceback.print_exc()
+
+        print(f"\nDone: https://huggingface.co/{HUB_GGUF_REPO}")
+    else:
+        print("\nHF_TOKEN not set — skipping Hub push.")
+
+    # ── Deploy instructions ───────────────────────────────────────────────
+    print(f"""
+{'='*60}
+  OLLAMA DEPLOYMENT
+{'='*60}
+
+  # Download GGUF
+  HF_TOKEN="..."
+  curl -L -H "Authorization: Bearer $HF_TOKEN" \\
+    "https://huggingface.co/{HUB_GGUF_REPO}/resolve/main/{target_name}" \\
+    -o ~/wagmi-sft.gguf
+
+  # Download Modelfile
+  curl -L -H "Authorization: Bearer $HF_TOKEN" \\
+    "https://huggingface.co/{HUB_GGUF_REPO}/resolve/main/Modelfile.wagmi-sft" \\
+    -o ~/Modelfile.wagmi-sft
+
+  # Edit Modelfile: change FROM line to point to local path
+  # FROM ~/wagmi-sft.gguf
+
+  # Create Ollama model
+  ollama create wagmi-sft -f ~/Modelfile.wagmi-sft
+
+  # Test
+  ollama run wagmi-sft "C'est quoi Deal ex Machina ?"
+
+{'='*60}
+""")
+
+
+if __name__ == "__main__":
+    run()
