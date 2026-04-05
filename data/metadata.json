@@ -1,56 +1,58 @@
 {
-  "generatedAt": "2026-03-24T13:37:02.136Z",
+  "generatedAt": "2026-04-05T11:46:51.077Z",
   "output": {
     "train": "datasets/wagmi-sft/train.jsonl",
     "eval": "datasets/wagmi-sft/eval.jsonl"
   },
   "counts": {
-    "total": 568,
-    "train": 483,
-    "eval": 85,
-    "sources": 11,
-    "blogSources": 9,
-    "extraSources": 2
+    "total": 780,
+    "train": 663,
+    "eval": 117,
+    "sources": 29,
+    "blogSources": 12,
+    "extraSources": 2,
+    "obsidianSources": 15
   },
   "distribution": {
     "byLocale": {
-      "en": 285,
-      "fr": 283
+      "en": 347,
+      "fr": 433
     },
     "byTag": {
-      "summary": 184,
-      "grounded": 436,
-      "site-content": 368,
-      "citation": 184,
+      "citation": 290,
+      "grounded": 648,
+      "site-content": 580,
+      "summary": 290,
+      "identity": 32,
+      "guardrail": 120,
       "refusal": 32,
       "out-of-scope": 32,
-      "guardrail": 120,
-      "cross-lingual": 54,
-      "auth-nudge": 6,
-      "unauth": 6,
+      "cross-lingual": 100,
       "qa": 62,
-      "approach": 4,
-      "partners": 2,
-      "anti-hallucination": 24,
-      "tech-stack": 22,
-      "identity": 32,
-      "hard-negative": 18,
-      "uncertainty": 36,
       "founder": 8,
-      "multi-turn": 8,
-      "blog": 6,
+      "tech-stack": 22,
+      "anti-hallucination": 24,
+      "approach": 4,
       "company": 10,
       "contact": 10,
+      "multi-turn": 8,
+      "uncertainty": 36,
+      "auth-nudge": 6,
+      "unauth": 6,
+      "blog": 6,
+      "hard-negative": 18,
+      "partners": 2,
       "services": 6,
       "compliance": 2
     },
     "bySourceType": {
-      "content": 368,
+      "content": 440,
       "synthetic:guardrail": 112,
+      "obsidian": 140,
       "synthetic:wagmi-qa": 28,
       "synthetic:grounded-qa": 34,
-      "synthetic:hard-negative": 18,
-      "synthetic:multi-turn": 8
+      "synthetic:multi-turn": 8,
+      "synthetic:hard-negative": 18
     }
   },
   "notes": [
@@ -59,6 +61,7 @@
     "Includes identity, anti-hallucination, uncertainty, refusal, and auth-nudge guardrail examples.",
     "Includes multi-turn conversations for dialogue coherence.",
     "Includes direct Q&A examples (no excerpt) for knowledge recall.",
+    "Optionally ingests Obsidian notes tagged with wagmi_sft: true (via OBSIDIAN_VAULT_PATH).",
     "Target model: Qwen 2.5 1.5B-Instruct. Target infra: HuggingFace L40."
   ]
 }
