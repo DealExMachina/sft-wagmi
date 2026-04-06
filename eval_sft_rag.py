@@ -33,12 +33,21 @@ DTYPE = torch.bfloat16
 OUTPUT_FILE = Path(f"output/{MODEL_PROFILE}_sft_rag_results.json")
 SFT_FILE = Path(f"output/{MODEL_PROFILE}_sft_results.json")
 
-GEN_KWARGS = dict(
-    max_new_tokens=300,
-    temperature=0.1,
-    do_sample=True,
-    repetition_penalty=1.1,
-)
+PROFILE_GEN_KWARGS = {
+    "small": dict(
+        max_new_tokens=int(os.environ.get("SMALL_MAX_NEW_TOKENS", "220")),
+        temperature=float(os.environ.get("SMALL_TEMPERATURE", "0.0")),
+        do_sample=False,
+        repetition_penalty=float(os.environ.get("SMALL_REPETITION_PENALTY", "1.05")),
+    ),
+    "auth": dict(
+        max_new_tokens=int(os.environ.get("AUTH_MAX_NEW_TOKENS", "220")),
+        temperature=float(os.environ.get("AUTH_TEMPERATURE", "0.0")),
+        do_sample=False,
+        repetition_penalty=float(os.environ.get("AUTH_REPETITION_PENALTY", "1.05")),
+    ),
+}
+GEN_KWARGS = PROFILE_GEN_KWARGS[MODEL_PROFILE]
 
 # ── RAG knowledge chunks (extracted from wagmi-skills.md) ──────────────────
 # Each prompt gets the most relevant chunk injected into the system prompt,
@@ -189,6 +198,8 @@ def run():
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    if getattr(model, "generation_config", None) is not None:
+        model.generation_config.max_length = None
 
     print(f"Model loaded. Running with RAG context injection.\n")
 
