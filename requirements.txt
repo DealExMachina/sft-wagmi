@@ -1,12 +1,11 @@
-# Unsloth SFT — Wagmi / Qwen2.5-1.5B-Instruct + auth (Mistral Small 3.1 via Unsloth)
+# Unsloth SFT — Wagmi / Qwen2.5-1.5B-Instruct + auth (Qwen2.5-14B via Unsloth)
 #
 # Stack alignment (check when upgrading):
 # - Dockerfile: pytorch 2.7.1 + CUDA 12.6 + post-install torch from cu126 index (torchao needs
 #   torch.utils._pytree.register_constant — present from PyTorch 2.7 onward, not in 2.6.x).
 # - Unsloth upstream optional deps: see https://github.com/unslothai/unsloth/blob/main/pyproject.toml
 #   [project.optional-dependencies] huggingfacenotorch / huggingface.
-# - Mistral Small 3.1 model card (mistralai/…): recommends vLLM; marks Transformers as lightly tested.
-#   We use unsloth/Mistral-Small-3.1-24B-Instruct-2503 (Unsloth’s packaging) + this TRL/Unsloth stack.
+# - Auth model default: Qwen/Qwen2.5-14B-Instruct (text-only path, stable with this stack).
 #
 # Run: pip install -r requirements.txt
 # If you see torchao / register_constant errors, see Dockerfile (torch reinstall order).

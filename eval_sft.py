@@ -16,9 +16,9 @@ PROFILE_CONFIG = {
         "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"),
     },
     "auth": {
-        "base_model_id": os.environ.get("AUTH_MODEL_ID", "unsloth/Mistral-Small-3.1-24B-Instruct-2503"),
-        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-mistral-small-3.1-24b-sft"),
-        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-mistral-small-3.1-24b-sft"),
+        "base_model_id": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
+        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-qwen2.5-14b-sft"),
+        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-14b-sft"),
     },
 }
 if MODEL_PROFILE not in PROFILE_CONFIG:

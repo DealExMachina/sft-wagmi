@@ -5,8 +5,8 @@ import os
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 
-# Auth (Mistral 3.1 24B 4-bit): on ~48GB, torch.compile + bnb dequant can OOM step 0.
-# On A100 80GB you can set AUTH_ENABLE_TORCH_COMPILE=1 and AUTH_MAX_SEQ_LEN=2048.
+# Auth (Qwen 2.5 14B 4-bit): keep compile disabled by default for stability.
+# On A100 80GB you can set AUTH_ENABLE_TORCH_COMPILE=1.
 # Apply compile-related env before importing Unsloth.
 _MODEL_PROFILE_EARLY = os.environ.get("MODEL_PROFILE", "small").strip().lower()
 if _MODEL_PROFILE_EARLY == "auth":
@@ -44,9 +44,8 @@ PROFILES = {
         "run_name": os.environ.get("SMALL_RUN_NAME", "wagmi-qwen2.5-1.5b"),
     },
     "auth": {
-        "model_id": os.environ.get("AUTH_MODEL_ID", "unsloth/Mistral-Small-3.1-24B-Instruct-2503"),
-        # 2048 often OOMs on L40S with 4-bit + LoRA + activations; override with AUTH_MAX_SEQ_LEN.
-        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", "1024")),
+        "model_id": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
+        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", "2048")),
         "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", "true").lower() != "false",
         "lora_r": int(os.environ.get("AUTH_LORA_R", "32")),
         "lora_alpha": int(os.environ.get("AUTH_LORA_ALPHA", "64")),
@@ -55,9 +54,9 @@ PROFILES = {
         "per_device_batch": int(os.environ.get("AUTH_PER_DEVICE_BATCH", "1")),
         "grad_accum": int(os.environ.get("AUTH_GRAD_ACCUM", "8")),
         "dataset_num_proc": int(os.environ.get("AUTH_DATASET_NUM_PROC", "1")),
-        "output_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-mistral-small-3.1-24b-sft"),
-        "hub_model_id": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-mistral-small-3.1-24b-sft"),
-        "run_name": os.environ.get("AUTH_RUN_NAME", "wagmi-mistral-small-3.1-24b"),
+        "output_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-qwen2.5-14b-sft"),
+        "hub_model_id": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-14b-sft"),
+        "run_name": os.environ.get("AUTH_RUN_NAME", "wagmi-qwen2.5-14b"),
     },
 }
 
@@ -102,7 +101,7 @@ def run():
     if MODEL_PROFILE == "auth":
         print(
             "Auth: default disables torch.compile (set AUTH_ENABLE_TORCH_COMPILE=1 on A100 80GB). "
-            "Default AUTH_MAX_SEQ_LEN=1024; use 2048 on 80GB if you have headroom. "
+            "Default AUTH_MAX_SEQ_LEN=2048 for Qwen2.5-14B. "
             "PYTORCH_CUDA_ALLOC_CONF may include expandable_segments."
         )
     print(json.dumps({

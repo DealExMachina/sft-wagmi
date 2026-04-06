@@ -172,7 +172,7 @@ Behavior:
 
 - **Steps** prefer root Python scripts (`baseline.py`, `train.py`, `autotune.py`, `eval_sft.py`, `eval_sft_rag.py`, `export_gguf.py`). If a script is missing, the launcher **falls back** to the matching `.ipynb` via `jupyter nbconvert --execute` when Jupyter is installed.
 - **`--sync-dataset`** runs `npm run dataset:wagmi:refresh` in `../dexm-one-page`.
-- **`--profile`**: `small` (Qwen 1.5B) or `auth` (Mistral 24B-style path); also `MODEL_PROFILE` env.
+- **`--profile`**: `small` (Qwen 1.5B) or `auth` (Qwen 2.5 14B path); also `MODEL_PROFILE` env.
 - **`HF_TOKEN`**: Hub pull/push. **`OPENAI_API_KEY`**: autotune judge (and related evals if configured).
 
 **HF Spaces / Gradio:** `app.py` mirrors the same flow in a UI (see Space config in the YAML header above).

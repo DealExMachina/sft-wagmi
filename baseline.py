@@ -13,7 +13,7 @@ from prompt_encode import build_generate_inputs
 MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
 PROFILE_MODEL_IDS = {
     "small": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
-    "auth": os.environ.get("AUTH_MODEL_ID", "unsloth/Mistral-Small-3.1-24B-Instruct-2503"),
+    "auth": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
 }
 if MODEL_PROFILE not in PROFILE_MODEL_IDS:
     raise ValueError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}. Expected one of: {', '.join(PROFILE_MODEL_IDS.keys())}")

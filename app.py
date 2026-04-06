@@ -93,11 +93,10 @@ with gr.Blocks(title="sft-wagmi") as demo:
         choices=PROFILE_CHOICES,
         value="small",
         label="Training profile",
-        info="small = Qwen 1.5B (non-auth), auth = Mistral Small 3.1 24B (authenticated tier)",
+        info="small = Qwen 1.5B (non-auth), auth = Qwen 2.5 14B (authenticated tier)",
     )
     gr.Markdown(
-        "Note: this pipeline is text SFT. You do not need to upload any image for training. "
-        "Mistral 3.1 supports vision at inference, but image fine-tuning is out of scope here."
+        "Note: this pipeline is text SFT only. You do not need to upload any image for training."
     )
 
     with gr.Tab("1. Baseline"):
@@ -109,7 +108,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
     with gr.Tab("2. Train"):
         gr.Markdown(
             "Fine-tune with LoRA/QLoRA on the Wagmi dataset. "
-            "small: Qwen 1.5B (fast). auth: Mistral Small 3.1 24B (longer run)."
+            "small: Qwen 1.5B (fast). auth: Qwen 2.5 14B (stronger tool-calling)."
         )
         train_btn = gr.Button("Run training", variant="primary")
         train_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
