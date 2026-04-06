@@ -16,20 +16,56 @@ from transformers import TrainingArguments
 from unsloth import FastLanguageModel
 from trl import SFTTrainer
 
-BASE_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
-HUB_ADAPTER = "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"
-OUTPUT_DIR = Path("output/wagmi-qwen2.5-1.5b-sft")
-MAX_SEQ_LEN = 2048
+MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
+PROFILES = {
+    "small": {
+        "base_model_id": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
+        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"),
+        "output_dir": os.environ.get("SMALL_OUTPUT_DIR", "output/wagmi-qwen2.5-1.5b-sft"),
+        "max_seq_len": int(os.environ.get("SMALL_MAX_SEQ_LEN", "2048")),
+        "load_in_4bit": os.environ.get("SMALL_LOAD_IN_4BIT", "false").lower() == "true",
+        "lora_r": int(os.environ.get("SMALL_LORA_R", "32")),
+        "lora_alpha": int(os.environ.get("SMALL_LORA_ALPHA", "64")),
+        "learning_rate": float(os.environ.get("SMALL_LEARNING_RATE", "5e-5")),
+        "num_epochs": int(os.environ.get("SMALL_NUM_EPOCHS", "3")),
+        "per_device_batch": int(os.environ.get("SMALL_PER_DEVICE_BATCH", "4")),
+        "grad_accum": int(os.environ.get("SMALL_GRAD_ACCUM", "2")),
+        "dataset_num_proc": int(os.environ.get("SMALL_DATASET_NUM_PROC", "2")),
+    },
+    "auth": {
+        "base_model_id": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
+        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-14b-sft"),
+        "output_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-qwen2.5-14b-sft"),
+        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", "2048")),
+        "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", "true").lower() != "false",
+        "lora_r": int(os.environ.get("AUTH_LORA_R", "32")),
+        "lora_alpha": int(os.environ.get("AUTH_LORA_ALPHA", "64")),
+        "learning_rate": float(os.environ.get("AUTH_LEARNING_RATE", "2e-5")),
+        "num_epochs": int(os.environ.get("AUTH_NUM_EPOCHS", "2")),
+        "per_device_batch": int(os.environ.get("AUTH_PER_DEVICE_BATCH", "1")),
+        "grad_accum": int(os.environ.get("AUTH_GRAD_ACCUM", "8")),
+        "dataset_num_proc": int(os.environ.get("AUTH_DATASET_NUM_PROC", "1")),
+    },
+}
+if MODEL_PROFILE not in PROFILES:
+    raise RuntimeError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}")
+
+cfg = PROFILES[MODEL_PROFILE]
+BASE_MODEL_ID = cfg["base_model_id"]
+HUB_ADAPTER = cfg["hub_adapter"]
+OUTPUT_DIR = Path(cfg["output_dir"])
+MAX_SEQ_LEN = int(cfg["max_seq_len"])
 DTYPE = torch.bfloat16
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 
-LORA_R = 32
-LORA_ALPHA = 64
+LORA_R = int(cfg["lora_r"])
+LORA_ALPHA = int(cfg["lora_alpha"])
 TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-LEARNING_RATE = 5e-5
-NUM_EPOCHS = 3
-PER_DEVICE_BATCH = 4
-GRAD_ACCUM = 2
+LEARNING_RATE = float(cfg["learning_rate"])
+NUM_EPOCHS = int(cfg["num_epochs"])
+PER_DEVICE_BATCH = int(cfg["per_device_batch"])
+GRAD_ACCUM = int(cfg["grad_accum"])
+DATASET_NUM_PROC = int(cfg["dataset_num_proc"])
 
 
 def main():
@@ -38,13 +74,14 @@ def main():
     iteration = int(sys.argv[3])
 
     print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"Profile: {MODEL_PROFILE}")
     print(f"Retrain step: iteration {iteration}")
     print(f"Train data: {train_path}")
     print(f"Eval data: {eval_path}")
 
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=BASE_MODEL_ID, max_seq_length=MAX_SEQ_LEN,
-        dtype=DTYPE, load_in_4bit=False,
+        dtype=DTYPE, load_in_4bit=bool(cfg["load_in_4bit"]),
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -76,7 +113,7 @@ def main():
         model=model, tokenizer=tokenizer,
         train_dataset=train_ds, eval_dataset=eval_ds,
         dataset_text_field="text", max_seq_length=MAX_SEQ_LEN,
-        dataset_num_proc=2, packing=False,
+        dataset_num_proc=DATASET_NUM_PROC, packing=False,
         args=TrainingArguments(
             output_dir=out_dir,
             num_train_epochs=NUM_EPOCHS,
@@ -90,8 +127,10 @@ def main():
             logging_steps=10, save_strategy="epoch", eval_strategy="epoch",
             load_best_model_at_end=True, metric_for_best_model="eval_loss",
             greater_is_better=False, report_to="none",
-            run_name=f"wagmi-autotune-iter{iteration}",
-            seed=42, dataloader_num_workers=2, dataloader_pin_memory=True,
+            run_name=f"wagmi-{MODEL_PROFILE}-autotune-iter{iteration}",
+            seed=42,
+            dataloader_num_workers=(0 if MODEL_PROFILE == "auth" else 2),
+            dataloader_pin_memory=(MODEL_PROFILE != "auth"),
         ),
     )
 

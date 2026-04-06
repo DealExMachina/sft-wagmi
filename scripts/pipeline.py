@@ -230,10 +230,6 @@ def main() -> int:
     do_eval_tools = args.eval_tools or run_all
     do_export = args.export or run_all
 
-    if profile == "auth" and do_autotune:
-        print("Autotune is currently supported for the small profile only. Disable --autotune for --profile auth.")
-        return 1
-
     if not any([do_preflight, do_sync, do_baseline, do_train, do_autotune, do_eval, do_eval_rag, do_eval_tools, do_export]):
         print("No step selected. Use --preflight, --all, or explicit step flags.")
         return 1

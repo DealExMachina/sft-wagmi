@@ -75,14 +75,6 @@ def run_eval_tools(profile: str):
 
 
 def run_autotune(profile: str):
-    if profile == "auth":
-        yield (
-            "Autotune is currently configured for the small profile only "
-            "(Qwen judge-correct-retrain loop). "
-            "For auth profile, run: Train -> Eval SFT -> Eval SFT+RAG.\n\n"
-            "If needed, we can add an auth-specific autotune loop next."
-        )
-        return
     yield from run_script("autotune.py", profile)
 
 
@@ -141,7 +133,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
 
     with gr.Tab("6. Autotune"):
         gr.Markdown(
-            "**Karpathy-style self-improvement loop (small profile only).** Claude scores each response (6 criteria), "
+            "**Karpathy-style self-improvement loop (small + auth).** GPT-4o scores each response (6 criteria), "
             "generates ideal answers for failures, merges into training set, and retrains. "
             "Up to 3 iterations. Requires `OPENAI_API_KEY` in Space variables."
         )

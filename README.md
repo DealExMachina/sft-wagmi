@@ -26,7 +26,7 @@ The stack has three layers:
 
 1. **RAG** — BM25-style local retrieval injects verified facts into the system prompt at inference time in the site ([`local-rag.ts`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/local-rag.ts)).
 2. **SFT** — JSONL chat examples generated from repo content (see below); identity, tone, uncertainty, and refusal reflexes.
-3. **Autotune** — iterative judge–correct–retrain loop with GPT-4o scoring on six criteria until convergence (small profile only).
+3. **Autotune** — iterative judge–correct–retrain loop with GPT-4o scoring on six criteria until convergence (small + auth profiles).
 
 **Dataset snapshot** (from `data/metadata.json` after sync; regenerate to refresh):
 
@@ -122,7 +122,7 @@ The adapter is pushed to [`jeanbaptdzd/wagmi-qwen2.5-1.5b-sft`](https://huggingf
 [Repeat] --> until mean score > 2.5/3.0 or 3 iterations
 ```
 
-Requires `OPENAI_API_KEY` and `HF_TOKEN`. **`--profile auth`**: training and export are supported; **autotune is disabled for the auth profile** in `pipeline.py` (small only).
+Requires `OPENAI_API_KEY` and `HF_TOKEN`. Supports both `--profile small` and `--profile auth`.
 
 ## Export to Ollama / GGUF
 

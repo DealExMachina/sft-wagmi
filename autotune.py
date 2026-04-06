@@ -28,24 +28,47 @@ import openai
 
 # ── Config ────────────────────────────────────────────────────────────────────
 MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
-if MODEL_PROFILE != "small":
-    raise RuntimeError(
-        "autotune.py currently supports MODEL_PROFILE=small only. "
-        "Use train/eval scripts for auth profile."
-    )
+PROFILE_CONFIG = {
+    "small": {
+        "base_model_id": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
+        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"),
+        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", "output/wagmi-qwen2.5-1.5b-sft"),
+        "max_seq_len": int(os.environ.get("SMALL_MAX_SEQ_LEN", "2048")),
+        "load_in_4bit": os.environ.get("SMALL_LOAD_IN_4BIT", "false").lower() == "true",
+    },
+    "auth": {
+        "base_model_id": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
+        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-14b-sft"),
+        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-qwen2.5-14b-sft"),
+        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", "2048")),
+        "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", "true").lower() != "false",
+    },
+}
+if MODEL_PROFILE not in PROFILE_CONFIG:
+    raise RuntimeError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}")
 
-BASE_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
-HUB_ADAPTER = "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"
-ADAPTER_DIR = "output/wagmi-qwen2.5-1.5b-sft"
-MAX_SEQ_LEN = 2048
+cfg = PROFILE_CONFIG[MODEL_PROFILE]
+BASE_MODEL_ID = cfg["base_model_id"]
+HUB_ADAPTER = cfg["hub_adapter"]
+ADAPTER_DIR = cfg["adapter_dir"]
+MAX_SEQ_LEN = int(cfg["max_seq_len"])
 DTYPE = torch.bfloat16
 
-GEN_KWARGS = dict(
-    max_new_tokens=300,
-    temperature=0.1,
-    do_sample=True,
-    repetition_penalty=1.1,
-)
+PROFILE_GEN_KWARGS = {
+    "small": dict(
+        max_new_tokens=int(os.environ.get("SMALL_MAX_NEW_TOKENS", "220")),
+        temperature=float(os.environ.get("SMALL_TEMPERATURE", "0.0")),
+        do_sample=False,
+        repetition_penalty=float(os.environ.get("SMALL_REPETITION_PENALTY", "1.05")),
+    ),
+    "auth": dict(
+        max_new_tokens=int(os.environ.get("AUTH_MAX_NEW_TOKENS", "220")),
+        temperature=float(os.environ.get("AUTH_TEMPERATURE", "0.0")),
+        do_sample=False,
+        repetition_penalty=float(os.environ.get("AUTH_REPETITION_PENALTY", "1.05")),
+    ),
+}
+GEN_KWARGS = PROFILE_GEN_KWARGS[MODEL_PROFILE]
 
 JUDGE_MODEL = "gpt-4o"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -57,8 +80,8 @@ FAILURE_THRESHOLD = 14  # total < 14/18 = needs correction
 
 TRAIN_FILE = Path("data/train.jsonl")
 EVAL_FILE = Path("data/eval.jsonl")
-OUTPUT_DIR = Path("output/wagmi-qwen2.5-1.5b-sft")
-HISTORY_FILE = Path("output/autotune_history.json")
+OUTPUT_DIR = Path(ADAPTER_DIR)
+HISTORY_FILE = Path(f"output/{MODEL_PROFILE}_autotune_history.json")
 
 CRITERIA = [
     "factual_accuracy", "language_match", "tone_persona",
@@ -488,21 +511,36 @@ def run():
     client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
     print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"Profile: {MODEL_PROFILE}")
     print(f"Judge: {JUDGE_MODEL}")
     print(f"Prompts: {len(PROMPTS)}")
     print(f"Max iterations: {MAX_ITERATIONS}, target: {SCORE_TARGET}/3.0\n")
 
-    # Load model with vanilla transformers (no Unsloth — keeps the process clean)
+    # small profile: vanilla transformers; auth profile: 4-bit Unsloth inference path.
     adapter_path = str(OUTPUT_DIR) if OUTPUT_DIR.exists() else HUB_ADAPTER
     print(f"Loading base model: {BASE_MODEL_ID}")
     print(f"Loading adapter: {adapter_path}")
 
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_ID)
-    base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL_ID, torch_dtype=DTYPE, device_map="auto")
-    model = PeftModel.from_pretrained(base_model, adapter_path)
-    model.eval()
+    base_model = None
+    if MODEL_PROFILE == "auth":
+        from unsloth import FastLanguageModel
+
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=adapter_path,
+            max_seq_length=MAX_SEQ_LEN,
+            dtype=DTYPE,
+            load_in_4bit=bool(cfg["load_in_4bit"]),
+        )
+        FastLanguageModel.for_inference(model)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_ID)
+        base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL_ID, torch_dtype=DTYPE, device_map="auto")
+        model = PeftModel.from_pretrained(base_model, adapter_path)
+        model.eval()
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    if getattr(model, "generation_config", None) is not None:
+        model.generation_config.max_length = None
 
     history = []
     OUTPUT_DIR.parent.mkdir(parents=True, exist_ok=True)
@@ -526,7 +564,7 @@ def run():
                 {"role": "user", "content": p["user"]},
             ]
             text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            inputs = tokenizer(text, return_tensors="pt").to(model.device)
+            inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
             with torch.no_grad():
                 out = model.generate(**inputs, **GEN_KWARGS)
             response = tokenizer.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
@@ -595,17 +633,33 @@ def run():
         merged_path = merge_corrections(TRAIN_FILE, corrections, iteration)
 
         # Free GPU memory before training subprocess
-        del model, base_model
+        del model
+        if base_model is not None:
+            del base_model
         torch.cuda.empty_cache()
 
         retrain_via_subprocess(merged_path, EVAL_FILE, iteration)
 
         # Reload with vanilla transformers for next iteration
         print(f"\n  Reloading model for next iteration ...")
-        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_ID)
-        base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL_ID, torch_dtype=DTYPE, device_map="auto")
-        model = PeftModel.from_pretrained(base_model, str(OUTPUT_DIR))
-        model.eval()
+        if MODEL_PROFILE == "auth":
+            from unsloth import FastLanguageModel
+
+            model, tokenizer = FastLanguageModel.from_pretrained(
+                model_name=str(OUTPUT_DIR),
+                max_seq_length=MAX_SEQ_LEN,
+                dtype=DTYPE,
+                load_in_4bit=bool(cfg["load_in_4bit"]),
+            )
+            FastLanguageModel.for_inference(model)
+            base_model = None
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_ID)
+            base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL_ID, torch_dtype=DTYPE, device_map="auto")
+            model = PeftModel.from_pretrained(base_model, str(OUTPUT_DIR))
+            model.eval()
+        if getattr(model, "generation_config", None) is not None:
+            model.generation_config.max_length = None
 
         print(f"\nIteration {iteration} complete.")
 
