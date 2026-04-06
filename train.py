@@ -5,6 +5,21 @@ import os
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 
+# Auth (Mistral 3.1 24B 4-bit): on ~48GB, torch.compile + bnb dequant can OOM step 0.
+# On A100 80GB you can set AUTH_ENABLE_TORCH_COMPILE=1 and AUTH_MAX_SEQ_LEN=2048.
+# Apply compile-related env before importing Unsloth.
+_MODEL_PROFILE_EARLY = os.environ.get("MODEL_PROFILE", "small").strip().lower()
+if _MODEL_PROFILE_EARLY == "auth":
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    _auth_torch_compile = os.environ.get("AUTH_ENABLE_TORCH_COMPILE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if not _auth_torch_compile:
+        os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
+        os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
+
 from unsloth import FastLanguageModel
 
 import torch
@@ -30,7 +45,8 @@ PROFILES = {
     },
     "auth": {
         "model_id": os.environ.get("AUTH_MODEL_ID", "unsloth/Mistral-Small-3.1-24B-Instruct-2503"),
-        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", "2048")),
+        # 2048 often OOMs on L40S with 4-bit + LoRA + activations; override with AUTH_MAX_SEQ_LEN.
+        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", "1024")),
         "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", "true").lower() != "false",
         "lora_r": int(os.environ.get("AUTH_LORA_R", "32")),
         "lora_alpha": int(os.environ.get("AUTH_LORA_ALPHA", "64")),
@@ -83,11 +99,18 @@ EVAL_FILE  = "data/eval.jsonl"
 def run():
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    if MODEL_PROFILE == "auth":
+        print(
+            "Auth: default disables torch.compile (set AUTH_ENABLE_TORCH_COMPILE=1 on A100 80GB). "
+            "Default AUTH_MAX_SEQ_LEN=1024; use 2048 on 80GB if you have headroom. "
+            "PYTORCH_CUDA_ALLOC_CONF may include expandable_segments."
+        )
     print(json.dumps({
         "profile": MODEL_PROFILE,
         "model": MODEL_ID, "lora_r": LORA_R, "lora_alpha": LORA_ALPHA,
         "lr": LEARNING_RATE, "epochs": NUM_EPOCHS,
         "load_in_4bit": LOAD_IN_4BIT,
+        "max_seq_len": MAX_SEQ_LEN,
         "bf16": BF16,
         "fp16": FP16,
         "effective_batch": PER_DEVICE_BATCH * GRAD_ACCUM,
@@ -135,6 +158,8 @@ def run():
     eval_ds = raw["eval"].map(format_chat, remove_columns=raw["eval"].column_names)
     print(f"Dataset: {len(train_ds)} train / {len(eval_ds)} eval")
 
+    dl_workers = 0 if MODEL_PROFILE == "auth" else 2
+
     # ── Train ──────────────────────────────────────────────────────────────
     trainer = SFTTrainer(
         model=model,
@@ -169,12 +194,14 @@ def run():
             report_to="none",
             run_name=cfg["run_name"],
             seed=42,
-            dataloader_num_workers=2,
-            dataloader_pin_memory=True,
+            dataloader_num_workers=dl_workers,
+            dataloader_pin_memory=(dl_workers > 0),
         ),
     )
 
     print("\nStarting training...")
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     stats = trainer.train()
     print(f"\nTraining complete. Runtime: {stats.metrics['train_runtime']:.0f}s")
     print(f"Train loss: {stats.metrics['train_loss']:.4f}")

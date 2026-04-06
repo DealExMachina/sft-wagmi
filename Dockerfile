@@ -5,7 +5,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Unsloth/transformers deps can install an older torch; torchao (via transformers) needs
+# torch>=2.5 with torch.utils._pytree.register_constant — reinstall CUDA wheels last.
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir --upgrade torch --index-url https://download.pytorch.org/whl/cu124
 
 COPY . .
 

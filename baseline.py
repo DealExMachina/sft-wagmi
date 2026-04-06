@@ -91,6 +91,7 @@ def run():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     print(f"Model loaded ({sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params)\n")
+    device = next(model.parameters()).device
 
     results = []
     for i, p in enumerate(PROMPTS, 1):
@@ -99,8 +100,7 @@ def run():
             {"role": "system", "content": p["system"]},
             {"role": "user", "content": p["user"]},
         ]
-        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
+        inputs = build_generate_inputs(tokenizer, messages, device)
         with torch.no_grad():
             out = model.generate(**inputs, **GEN_KWARGS)
         response = tokenizer.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
