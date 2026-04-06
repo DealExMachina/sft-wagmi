@@ -5,10 +5,18 @@ import subprocess
 import sys
 
 # Match Dockerfile: Triton/torchao must not use /.triton when HOME is / (e.g. HF Spaces).
-os.environ.setdefault("TRITON_CACHE_DIR", "/tmp/triton_cache")
-os.environ.setdefault("XDG_CACHE_HOME", "/tmp/.cache")
+cache_base = os.environ.get("CACHE_BASE_DIR", "/data")
+if not os.access(cache_base, os.W_OK):
+    cache_base = "/tmp"
+os.environ.setdefault("TRITON_CACHE_DIR", f"{cache_base}/triton_cache")
+os.environ.setdefault("XDG_CACHE_HOME", f"{cache_base}/.cache")
 if not os.environ.get("HOME") or os.environ.get("HOME") == "/":
     os.environ["HOME"] = "/tmp"
+for _cache_dir in (os.environ["TRITON_CACHE_DIR"], os.environ["XDG_CACHE_HOME"]):
+    try:
+        os.makedirs(_cache_dir, exist_ok=True)
+    except OSError:
+        pass
 
 import gradio as gr
 import torch

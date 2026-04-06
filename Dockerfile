@@ -3,6 +3,7 @@ FROM pytorch/pytorch:2.7.1-cuda12.6-cudnn9-devel
 # Silence pip “running as root” noise in container builds (expected here).
 ENV PIP_ROOT_USER_ACTION=ignore
 # Triton (torchao import chain) must not use /.triton when HOME is / (common on HF Spaces).
+ENV CACHE_BASE_DIR=/data
 ENV TRITON_CACHE_DIR=/tmp/triton_cache
 ENV XDG_CACHE_HOME=/tmp/.cache
 ENV HOME=/tmp
@@ -29,7 +30,10 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY . .
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh && mkdir -p /tmp/triton_cache /tmp/.cache /app/output
+RUN chmod +x /docker-entrypoint.sh \
+    && mkdir -p /tmp/triton_cache /tmp/.cache /app/output /data \
+    && chmod 1777 /tmp \
+    && chmod -R 777 /tmp/triton_cache /tmp/.cache /app/output /data
 
 EXPOSE 7860
 
