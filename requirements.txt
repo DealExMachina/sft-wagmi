@@ -4,6 +4,8 @@
 # If you see torchao / register_constant errors, reinstall torch after (see Dockerfile).
 
 # Core Unsloth wheel — picks the right CUDA variant automatically
+# unsloth_zoo: required import metadata (unsloth __init__ calls importlib.version); keep explicit.
+unsloth_zoo
 unsloth @ git+https://github.com/unslothai/unsloth.git
 
 # Training stack (torch may be downgraded by unsloth; Dockerfile reinstalls cu124 torch after)

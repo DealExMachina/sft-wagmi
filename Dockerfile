@@ -8,7 +8,8 @@ COPY requirements.txt .
 # Unsloth/transformers deps can install an older torch; torchao (via transformers) needs
 # torch>=2.5 with torch.utils._pytree.register_constant — reinstall CUDA wheels last.
 RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir --upgrade torch --index-url https://download.pytorch.org/whl/cu124
+    && pip install --no-cache-dir --upgrade torch --index-url https://download.pytorch.org/whl/cu124 \
+    && pip install --no-cache-dir --upgrade unsloth_zoo
 
 COPY . .
 
