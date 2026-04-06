@@ -3,9 +3,16 @@
 import datetime
 import json
 import os
+import warnings
 from pathlib import Path
 
 import torch
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"The attention mask API under `transformers\.modeling_attn_mask_utils`.*",
+    category=FutureWarning,
+)
 
 # ── Config ─────────────────────────────────────────────────────────────────
 MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()

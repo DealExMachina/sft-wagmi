@@ -6,6 +6,7 @@ Usage: python retrain_step.py <train_jsonl> <eval_jsonl> <iteration>
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
@@ -15,6 +16,12 @@ from datasets import load_dataset
 from transformers import TrainingArguments
 from unsloth import FastLanguageModel
 from trl import SFTTrainer
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"The attention mask API under `transformers\.modeling_attn_mask_utils`.*",
+    category=FutureWarning,
+)
 
 MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
 PROFILES = {

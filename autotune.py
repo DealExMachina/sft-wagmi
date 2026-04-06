@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import sys
+import warnings
 from collections import Counter
 from pathlib import Path
 
@@ -25,6 +26,12 @@ from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import openai
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"The attention mask API under `transformers\.modeling_attn_mask_utils`.*",
+    category=FutureWarning,
+)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()

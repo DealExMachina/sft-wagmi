@@ -2,6 +2,7 @@
 
 import json
 import os
+import warnings
 from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
@@ -27,6 +28,12 @@ import torch
 from datasets import concatenate_datasets, load_dataset
 from transformers import TrainingArguments
 from trl import SFTTrainer
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"The attention mask API under `transformers\.modeling_attn_mask_utils`.*",
+    category=FutureWarning,
+)
 
 PROFILES = {
     "small": {
