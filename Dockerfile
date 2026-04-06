@@ -19,10 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Build llama.cpp at image build-time so Unsloth GGUF export never needs runtime apt/install prompts.
+# Build llama.cpp at image build-time (CPU-only) so Unsloth GGUF export never needs runtime apt/install prompts.
+# HF Space *image* builds run on CPU builders — GGML_CUDA=ON compiles hundreds of .cu files and is slow and pointless
+# here: convert_hf_to_gguf + llama-quantize only need CPU. PyTorch/CUDA in the base image still uses the Space GPU (e.g. L40S) at runtime.
 RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp "${UNSLOTH_LLAMA_CPP_PATH}" \
     && cmake -S "${UNSLOTH_LLAMA_CPP_PATH}" -B "${UNSLOTH_LLAMA_CPP_PATH}/build" \
-       -DBUILD_SHARED_LIBS=OFF -DGGML_CUDA=ON -DLLAMA_CURL=ON \
+       -DBUILD_SHARED_LIBS=OFF -DGGML_CUDA=OFF -DLLAMA_CURL=ON \
     && cmake --build "${UNSLOTH_LLAMA_CPP_PATH}/build" --config Release -j"$(nproc)" --target llama-quantize \
     && cp "${UNSLOTH_LLAMA_CPP_PATH}/build/bin/llama-quantize" "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" \
     && chmod +x "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" \
