@@ -1,21 +1,31 @@
-# Unsloth SFT — Wagmi / Qwen2.5-1.5B-Instruct
-# Install on a CUDA 12.4 + PyTorch 2.6 host (e.g. HuggingFace Space)
+# Unsloth SFT — Wagmi / Qwen2.5-1.5B-Instruct + auth (Mistral Small 3.1 via Unsloth)
+#
+# Stack alignment (check when upgrading):
+# - Dockerfile: pytorch/pytorch:2.6.0-cuda12.4 + post-install torch from cu124 index (torchao needs
+#   torch>=2.5 / register_constant; unsloth_zoo may downgrade torch — Dockerfile reapplies torch).
+# - Unsloth upstream optional deps: see https://github.com/unslothai/unsloth/blob/main/pyproject.toml
+#   [project.optional-dependencies] huggingfacenotorch / huggingface.
+# - Mistral Small 3.1 model card (mistralai/…): recommends vLLM; marks Transformers as lightly tested.
+#   We use unsloth/Mistral-Small-3.1-24B-Instruct-2503 (Unsloth’s packaging) + this TRL/Unsloth stack.
+#
 # Run: pip install -r requirements.txt
-# If you see torchao / register_constant errors, reinstall torch after (see Dockerfile).
+# If you see torchao / register_constant errors, see Dockerfile (torch reinstall order).
 
-# Core Unsloth wheel — picks the right CUDA variant automatically
-# unsloth_zoo: required import metadata (unsloth __init__ calls importlib.version); keep explicit.
-unsloth_zoo
+# Core Unsloth (git) + zoo (PyPI; version aligned with unsloth[huggingface] extra)
+unsloth_zoo>=2026.4.2
 unsloth @ git+https://github.com/unslothai/unsloth.git
 
-# Training stack (torch may be downgraded by unsloth; Dockerfile reinstalls cu124 torch after)
+# PyTorch: base image + Dockerfile enforce cu124 torch 2.6.x; floor here documents intent for local installs
 torch>=2.6.0
-trl>=0.12.0
-transformers>=4.47.0
-datasets>=3.0.0
-peft>=0.14.0
-bitsandbytes>=0.45.0
-accelerate>=0.34.0
+
+# Hugging Face training stack — floors match unsloth huggingfacenotorch (approx.; bad transformers
+# micro-releases are excluded upstream — bump carefully if Unsloth CI breaks)
+trl>=0.18.2,<=0.24.0
+transformers>=4.51.3,<=5.5.0
+datasets>=3.4.1,<4.4.0
+peft>=0.18.0
+bitsandbytes>=0.45.5
+accelerate>=0.34.1
 
 # Hub + logging
 huggingface_hub>=0.26.0
