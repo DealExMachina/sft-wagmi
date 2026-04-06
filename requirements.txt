@@ -1,8 +1,8 @@
 # Unsloth SFT — Wagmi / Qwen2.5-1.5B-Instruct + auth (Mistral Small 3.1 via Unsloth)
 #
 # Stack alignment (check when upgrading):
-# - Dockerfile: pytorch/pytorch:2.6.0-cuda12.4 + post-install torch from cu124 index (torchao needs
-#   torch>=2.5 / register_constant; unsloth_zoo may downgrade torch — Dockerfile reapplies torch).
+# - Dockerfile: pytorch 2.7.1 + CUDA 12.6 + post-install torch from cu126 index (torchao needs
+#   torch.utils._pytree.register_constant — present from PyTorch 2.7 onward, not in 2.6.x).
 # - Unsloth upstream optional deps: see https://github.com/unslothai/unsloth/blob/main/pyproject.toml
 #   [project.optional-dependencies] huggingfacenotorch / huggingface.
 # - Mistral Small 3.1 model card (mistralai/…): recommends vLLM; marks Transformers as lightly tested.
@@ -15,8 +15,8 @@
 unsloth_zoo>=2026.4.2
 unsloth @ git+https://github.com/unslothai/unsloth.git
 
-# PyTorch: base image + Dockerfile enforce cu124 torch 2.6.x; floor here documents intent for local installs
-torch>=2.6.0
+# PyTorch: Dockerfile enforces cu126 torch 2.7.x+ for torchao; match floor for local installs
+torch>=2.7.0
 
 # Hugging Face training stack — floors match unsloth huggingfacenotorch (approx.; bad transformers
 # micro-releases are excluded upstream — bump carefully if Unsloth CI breaks)
