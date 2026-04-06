@@ -10,24 +10,19 @@ ENV XDG_CACHE_HOME=/tmp/.cache
 ENV HOME=/tmp
 ENV UNSLOTH_LLAMA_CPP_PATH=/opt/llama.cpp
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    build-essential \
-    cmake \
-    curl \
-    libcurl4-openssl-dev \
-    libssl-dev \
+RUN apt-get update && apt-get install -y --no-install-recommends git curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Build llama.cpp at image build-time (CPU-only) so Unsloth GGUF export never needs runtime apt/install prompts.
-# HF Space *image* builds run on CPU builders — GGML_CUDA=ON compiles hundreds of .cu files and is slow and pointless
-# here: convert_hf_to_gguf + llama-quantize only need CPU. PyTorch/CUDA in the base image still uses the Space GPU (e.g. L40S) at runtime.
-RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp "${UNSLOTH_LLAMA_CPP_PATH}" \
-    && cmake -S "${UNSLOTH_LLAMA_CPP_PATH}" -B "${UNSLOTH_LLAMA_CPP_PATH}/build" \
-       -DBUILD_SHARED_LIBS=OFF -DGGML_CUDA=OFF -DLLAMA_CURL=ON \
-    && cmake --build "${UNSLOTH_LLAMA_CPP_PATH}/build" --config Release -j"$(nproc)" --target llama-quantize \
-    && cp "${UNSLOTH_LLAMA_CPP_PATH}/build/bin/llama-quantize" "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" \
+# Provision llama.cpp tools from prebuilt release (no compilation).
+# Unsloth's save_pretrained_gguf needs: llama-quantize (binary) + convert_hf_to_gguf.py (Python script).
+ARG LLAMA_CPP_TAG=b8676
+RUN mkdir -p "${UNSLOTH_LLAMA_CPP_PATH}" \
+    && curl -sL "https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_CPP_TAG}/llama-${LLAMA_CPP_TAG}-bin-ubuntu-x64.tar.gz" \
+       | tar xz --strip-components=1 -C "${UNSLOTH_LLAMA_CPP_PATH}" \
     && chmod +x "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" \
+    && curl -sL "https://raw.githubusercontent.com/ggml-org/llama.cpp/${LLAMA_CPP_TAG}/convert_hf_to_gguf.py" \
+       -o "${UNSLOTH_LLAMA_CPP_PATH}/convert_hf_to_gguf.py" \
+    && test -x "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" \
     && test -f "${UNSLOTH_LLAMA_CPP_PATH}/convert_hf_to_gguf.py"
 
 WORKDIR /app
