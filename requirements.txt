@@ -15,8 +15,8 @@
 unsloth_zoo>=2026.4.2
 unsloth @ git+https://github.com/unslothai/unsloth.git
 
-# PyTorch: Dockerfile enforces cu126 torch 2.7.x+ for torchao; match floor for local installs
-torch>=2.7.0
+# PyTorch: Dockerfile pins torch==2.7.1+cu126 (register_constant + unsloth_zoo requires torch<2.11).
+torch>=2.7.0,<2.11.0
 
 # Hugging Face training stack — floors match unsloth huggingfacenotorch (approx.; bad transformers
 # micro-releases are excluded upstream — bump carefully if Unsloth CI breaks)
