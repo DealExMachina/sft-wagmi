@@ -133,7 +133,13 @@ python3 scripts/pipeline.py --export
 # or: python3 export_gguf.py
 ```
 
-Profiles: `MODEL_PROFILE=small` (default) or `auth` (Mistral Small 24B path; separate Hub repos — see env defaults in `export_gguf.py`).
+Profiles: `MODEL_PROFILE=small` (default) or `auth` (Qwen 2.5 14B path; separate Hub repos — see env defaults in `export_gguf.py`).
+
+For auth profile tool-calling specialization (email + calendar), `train.py` auto-injects
+`data/tooling_email_calendar.jsonl` with oversampling:
+
+- `AUTH_TOOLING_FILE` (default: `data/tooling_email_calendar.jsonl`)
+- `AUTH_TOOLING_MULTIPLIER` (default: `3`)
 
 **Standalone Mac/Linux helper:** `scripts/export_ollama.py` — download adapter, merge on CPU (~6 GB RAM for 1.5B), convert with [llama.cpp](https://github.com/ggerganov/llama.cpp), quantize Q4_K_M, register with Ollama:
 

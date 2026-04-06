@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 
@@ -23,7 +24,7 @@ if _MODEL_PROFILE_EARLY == "auth":
 from unsloth import FastLanguageModel
 
 import torch
-from datasets import load_dataset
+from datasets import concatenate_datasets, load_dataset
 from transformers import TrainingArguments
 from trl import SFTTrainer
 
@@ -93,6 +94,8 @@ FP16 = not BF16
 # ── Data ───────────────────────────────────────────────────────────────────
 TRAIN_FILE = "data/train.jsonl"
 EVAL_FILE  = "data/eval.jsonl"
+AUTH_TOOLING_FILE = os.environ.get("AUTH_TOOLING_FILE", "data/tooling_email_calendar.jsonl")
+AUTH_TOOLING_MULTIPLIER = int(os.environ.get("AUTH_TOOLING_MULTIPLIER", "3"))
 
 
 def run():
@@ -146,6 +149,22 @@ def run():
 
     # ── Dataset ────────────────────────────────────────────────────────────
     raw = load_dataset("json", data_files={"train": TRAIN_FILE, "eval": EVAL_FILE})
+
+    if MODEL_PROFILE == "auth":
+        tooling_path = Path(AUTH_TOOLING_FILE)
+        if tooling_path.exists():
+            tooling_train = load_dataset("json", data_files={"train": str(tooling_path)})["train"]
+            base_tooling_count = len(tooling_train)
+            if AUTH_TOOLING_MULTIPLIER > 1:
+                tooling_train = concatenate_datasets([tooling_train] * AUTH_TOOLING_MULTIPLIER)
+            raw["train"] = concatenate_datasets([raw["train"], tooling_train]).shuffle(seed=42)
+            print(
+                "Auth tooling data enabled: "
+                f"{base_tooling_count} base examples x {max(1, AUTH_TOOLING_MULTIPLIER)} "
+                f"-> {len(tooling_train)} injected train rows."
+            )
+        else:
+            print(f"Auth tooling data not found at {tooling_path}; continuing with base dataset only.")
 
     def format_chat(example):
         text = tokenizer.apply_chat_template(
