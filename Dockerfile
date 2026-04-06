@@ -22,8 +22,9 @@ RUN mkdir -p "${UNSLOTH_LLAMA_CPP_PATH}" \
     && chmod +x "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" \
     && curl -sL "https://raw.githubusercontent.com/ggml-org/llama.cpp/${LLAMA_CPP_TAG}/convert_hf_to_gguf.py" \
        -o "${UNSLOTH_LLAMA_CPP_PATH}/convert_hf_to_gguf.py" \
-    && pip install --no-cache-dir gguf \
-    && test -x "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" \
+    && pip install --no-cache-dir gguf mistral_common \
+    && python -c "import gguf; print('gguf', gguf.__version__)" \
+    && "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" --help > /dev/null 2>&1 \
     && test -f "${UNSLOTH_LLAMA_CPP_PATH}/convert_hf_to_gguf.py"
 
 WORKDIR /app
