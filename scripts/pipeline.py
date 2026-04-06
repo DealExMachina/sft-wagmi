@@ -29,6 +29,7 @@ SCRIPT_STEPS = {
     "autotune": ROOT / "autotune.py",
     "eval": ROOT / "eval_sft.py",
     "eval-rag": ROOT / "eval_sft_rag.py",
+    "eval-tools": ROOT / "eval_tool_calls.py",
     "export": ROOT / "export_gguf.py",
 }
 NOTEBOOKS = {
@@ -206,6 +207,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--autotune", action="store_true", help="Execute autotune step")
     parser.add_argument("--eval", action="store_true", help="Execute eval_sft.py")
     parser.add_argument("--eval-rag", action="store_true", help="Execute eval_sft_rag.py")
+    parser.add_argument("--eval-tools", action="store_true", help="Execute eval_tool_calls.py")
     parser.add_argument("--export", action="store_true", help="Execute export step")
     parser.add_argument("--all", action="store_true", help="Run sync + baseline + train + autotune + eval + eval-rag + export")
     parser.add_argument("--dry-run", action="store_true", help="Print commands without executing them")
@@ -225,13 +227,14 @@ def main() -> int:
     do_autotune = args.autotune or run_all
     do_eval = args.eval or run_all
     do_eval_rag = args.eval_rag or run_all
+    do_eval_tools = args.eval_tools or run_all
     do_export = args.export or run_all
 
     if profile == "auth" and do_autotune:
         print("Autotune is currently supported for the small profile only. Disable --autotune for --profile auth.")
         return 1
 
-    if not any([do_preflight, do_sync, do_baseline, do_train, do_autotune, do_eval, do_eval_rag, do_export]):
+    if not any([do_preflight, do_sync, do_baseline, do_train, do_autotune, do_eval, do_eval_rag, do_eval_tools, do_export]):
         print("No step selected. Use --preflight, --all, or explicit step flags.")
         return 1
 
@@ -271,6 +274,11 @@ def main() -> int:
     if do_eval_rag:
         print_header(f"Eval SFT + RAG ({profile})")
         if run_pipeline_step("eval-rag", args.dry_run, profile) != 0:
+            return 1
+
+    if do_eval_tools:
+        print_header(f"Eval Tool Calls ({profile})")
+        if run_pipeline_step("eval-tools", args.dry_run, profile) != 0:
             return 1
 
     if do_export:

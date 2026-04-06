@@ -70,6 +70,10 @@ def run_eval_rag(profile: str):
     yield from run_script("eval_sft_rag.py", profile)
 
 
+def run_eval_tools(profile: str):
+    yield from run_script("eval_tool_calls.py", profile)
+
+
 def run_autotune(profile: str):
     if profile == "auth":
         yield (
@@ -126,7 +130,16 @@ with gr.Blocks(title="sft-wagmi") as demo:
         eval_rag_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
         eval_rag_btn.click(fn=run_eval_rag, inputs=profile, outputs=eval_rag_out)
 
-    with gr.Tab("5. Autotune"):
+    with gr.Tab("5. Eval Tool Calls"):
+        gr.Markdown(
+            "Evaluate tool-calling quality on email/calendar scenarios "
+            "(JSON validity, tool-name match, required-arg coverage)."
+        )
+        eval_tools_btn = gr.Button("Run tool-calling eval", variant="primary")
+        eval_tools_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
+        eval_tools_btn.click(fn=run_eval_tools, inputs=profile, outputs=eval_tools_out)
+
+    with gr.Tab("6. Autotune"):
         gr.Markdown(
             "**Karpathy-style self-improvement loop (small profile only).** Claude scores each response (6 criteria), "
             "generates ideal answers for failures, merges into training set, and retrains. "
@@ -136,7 +149,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
         autotune_out = gr.Textbox(label="Output", lines=40, max_lines=120, autoscroll=True)
         autotune_btn.click(fn=run_autotune, inputs=profile, outputs=autotune_out)
 
-    with gr.Tab("6. Export GGUF"):
+    with gr.Tab("7. Export GGUF"):
         gr.Markdown(
             "**Export to Ollama.** Merges LoRA adapter into base model, exports GGUF (Q4_K_M + Q8_0), "
             "pushes to HuggingFace Hub, and generates an Ollama Modelfile. "

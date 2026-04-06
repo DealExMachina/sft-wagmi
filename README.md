@@ -171,6 +171,7 @@ python3 scripts/pipeline.py --profile small --train
 python3 scripts/pipeline.py --profile auth --train
 python3 scripts/pipeline.py --eval
 python3 scripts/pipeline.py --eval-rag
+python3 scripts/pipeline.py --eval-tools
 python3 scripts/pipeline.py --all --dry-run
 ```
 
