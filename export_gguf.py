@@ -9,6 +9,7 @@ import traceback
 from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
+os.environ.setdefault("DEBIAN_FRONTEND", "noninteractive")
 
 import torch
 from huggingface_hub import HfApi, create_repo
@@ -46,6 +47,7 @@ HUB_GGUF_REPO = cfg["hub_gguf_repo"]
 
 GGUF_DIR = Path(f"output/{MODEL_PROFILE}-gguf")
 QUANT = "q4_k_m"
+LLAMA_CPP_PATH = Path(os.environ.get("UNSLOTH_LLAMA_CPP_PATH", "/opt/llama.cpp"))
 
 SYSTEM_PROMPT = (
     "Tu es Wagmi, le watchdog de Deal ex Machina. "
@@ -78,7 +80,13 @@ SYSTEM """{system_prompt}"""
 ''',
     "auth": '''FROM {gguf_filename}
 
-TEMPLATE """{{{{- if .System }}}}[SYSTEM_PROMPT]{{{{ .System }}}}[/SYSTEM_PROMPT]{{{{ end }}}}[INST]{{{{ .Prompt }}}}[/INST]{{{{ .Response }}}}</s>"""
+TEMPLATE """{{{{- if .System }}}}<|im_start|>system
+{{{{ .System }}}}<|im_end|>
+{{{{ end }}}}<|im_start|>user
+{{{{ .Prompt }}}}<|im_end|>
+<|im_start|>assistant
+{{{{ .Response }}}}<|im_end|>
+"""
 
 PARAMETER num_ctx 2048
 PARAMETER num_predict 220
@@ -87,16 +95,36 @@ PARAMETER top_k 30
 PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.12
 PARAMETER repeat_last_n 128
-PARAMETER stop "</s>"
-PARAMETER stop "[INST]"
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
 
 SYSTEM """{system_prompt}"""
 ''',
 }
 
 
+def assert_llama_cpp_ready() -> None:
+    """Fail fast with clear actions instead of triggering Unsloth runtime installers."""
+    quantizer = LLAMA_CPP_PATH / "llama-quantize"
+    converter_a = LLAMA_CPP_PATH / "convert_hf_to_gguf.py"
+    converter_b = LLAMA_CPP_PATH / "convert-hf-to-gguf.py"
+    if quantizer.exists() and (converter_a.exists() or converter_b.exists()):
+        return
+
+    raise RuntimeError(
+        "GGUF export prerequisites missing.\n"
+        f"Expected prebuilt llama.cpp in {LLAMA_CPP_PATH} with:\n"
+        "- llama-quantize\n"
+        "- convert_hf_to_gguf.py (or convert-hf-to-gguf.py)\n\n"
+        "This project is configured for build-time provisioning (no runtime apt-get prompts).\n"
+        "Rebuild the Docker image after Dockerfile changes, or set UNSLOTH_LLAMA_CPP_PATH to a valid llama.cpp install."
+    )
+
+
 def run():
     print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"llama.cpp path: {LLAMA_CPP_PATH}")
+    assert_llama_cpp_ready()
 
     adapter_path = ADAPTER_DIR if Path(ADAPTER_DIR).exists() else HUB_ADAPTER
     print(f"\nLoading base model: {BASE_MODEL_ID}")
