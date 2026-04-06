@@ -1,8 +1,14 @@
 """Minimal Gradio UI for triggering baseline eval and SFT training."""
 
+import os
 import subprocess
 import sys
-import os
+
+# Match Dockerfile: Triton/torchao must not use /.triton when HOME is / (e.g. HF Spaces).
+os.environ.setdefault("TRITON_CACHE_DIR", "/tmp/triton_cache")
+os.environ.setdefault("XDG_CACHE_HOME", "/tmp/.cache")
+if not os.environ.get("HOME") or os.environ.get("HOME") == "/":
+    os.environ["HOME"] = "/tmp"
 
 import gradio as gr
 import torch
