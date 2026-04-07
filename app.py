@@ -78,6 +78,10 @@ def run_autotune(profile: str):
     yield from run_script("autotune.py", profile)
 
 
+def run_export_merged(profile: str):
+    yield from run_script("export_merged.py", profile)
+
+
 def run_export_gguf(profile: str):
     yield from run_script("export_gguf.py", profile)
 
@@ -141,13 +145,22 @@ with gr.Blocks(title="sft-wagmi") as demo:
         autotune_out = gr.Textbox(label="Output", lines=40, max_lines=120, autoscroll=True)
         autotune_btn.click(fn=run_autotune, inputs=profile, outputs=autotune_out)
 
-    with gr.Tab("7. Export GGUF"):
+    with gr.Tab("7. Export Merged"):
         gr.Markdown(
-            "**Export to Ollama.** Merges LoRA adapter into base model, exports GGUF (Q4_K_M + Q8_0), "
-            "pushes to HuggingFace Hub, and generates an Ollama Modelfile. "
-            "Run this after training or autotune completes."
+            "**Merge LoRA + push to Hub.** Merges the adapter into the base model "
+            "and uploads merged safetensors to HuggingFace Hub. "
+            "GGUF conversion runs locally on your Mac via `scripts/local_gguf_export.sh`."
         )
-        export_btn = gr.Button("Export GGUF", variant="primary")
+        export_merged_btn = gr.Button("Export Merged Model", variant="primary")
+        export_merged_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
+        export_merged_btn.click(fn=run_export_merged, inputs=profile, outputs=export_merged_out)
+
+    with gr.Tab("7b. Export GGUF (legacy)"):
+        gr.Markdown(
+            "**Legacy: full GGUF export on Space.** Requires llama.cpp in the Docker image. "
+            "Prefer tab 7 (merged export) + local GGUF conversion instead."
+        )
+        export_btn = gr.Button("Export GGUF", variant="secondary")
         export_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
         export_btn.click(fn=run_export_gguf, inputs=profile, outputs=export_out)
 

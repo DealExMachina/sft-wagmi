@@ -8,24 +8,8 @@ ENV CACHE_BASE_DIR=/data
 ENV TRITON_CACHE_DIR=/tmp/triton_cache
 ENV XDG_CACHE_HOME=/tmp/.cache
 ENV HOME=/tmp
-ENV UNSLOTH_LLAMA_CPP_PATH=/opt/llama.cpp
-
 RUN apt-get update && apt-get install -y --no-install-recommends git curl \
     && rm -rf /var/lib/apt/lists/*
-
-# Provision llama.cpp tools from prebuilt release (no compilation).
-# Unsloth's save_pretrained_gguf needs: llama-quantize (binary) + convert_hf_to_gguf.py (Python script).
-ARG LLAMA_CPP_TAG=b8676
-RUN mkdir -p "${UNSLOTH_LLAMA_CPP_PATH}" \
-    && curl -sL "https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_CPP_TAG}/llama-${LLAMA_CPP_TAG}-bin-ubuntu-x64.tar.gz" \
-       | tar xz --strip-components=1 -C "${UNSLOTH_LLAMA_CPP_PATH}" \
-    && chmod +x "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" \
-    && curl -sL "https://raw.githubusercontent.com/ggml-org/llama.cpp/${LLAMA_CPP_TAG}/convert_hf_to_gguf.py" \
-       -o "${UNSLOTH_LLAMA_CPP_PATH}/convert_hf_to_gguf.py" \
-    && pip install --no-cache-dir gguf mistral_common \
-    && python -c "import gguf; print('gguf', gguf.__version__)" \
-    && "${UNSLOTH_LLAMA_CPP_PATH}/llama-quantize" --help > /dev/null 2>&1 \
-    && test -f "${UNSLOTH_LLAMA_CPP_PATH}/convert_hf_to_gguf.py"
 
 WORKDIR /app
 
