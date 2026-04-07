@@ -107,6 +107,27 @@ def run_merge_next():
     yield output
 
 
+def run_full_pipeline(profile: str):
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "scripts/pipeline.py", "--all", "--profile", profile],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+    )
+    output = ""
+    for line in iter(proc.stdout.readline, ""):
+        output += line
+        yield output
+    proc.wait()
+    if proc.returncode != 0:
+        output += f"\n\nProcess exited with code {proc.returncode}"
+    else:
+        output += "\n\nDone."
+    yield output
+
+
 def get_version():
     version_file = os.path.join(os.path.dirname(__file__), "VERSION")
     try:
@@ -128,6 +149,15 @@ with gr.Blocks(title="sft-wagmi") as demo:
     gr.Markdown(
         "Note: this pipeline is text SFT only. You do not need to upload any image for training."
     )
+
+    with gr.Tab("FULL PIPELINE"):
+        gr.Markdown(
+            "**One-click full pipeline:** preflight → merge data/next/ → train → eval → eval+RAG → export merged.\n\n"
+            "Select the profile above, then hit the button. Sit back."
+        )
+        full_btn = gr.Button("Run full pipeline", variant="primary", size="lg")
+        full_out = gr.Textbox(label="Output", lines=40, max_lines=200, autoscroll=True)
+        full_btn.click(fn=run_full_pipeline, inputs=profile, outputs=full_out)
 
     with gr.Tab("0. Merge Next Data"):
         gr.Markdown(
