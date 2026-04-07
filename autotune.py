@@ -319,7 +319,7 @@ def build_system_prompt(locale: str, category: str) -> str:
     return f"{base}\n{quality}\n\n{no_ctx}"
 
 
-# ── Claude judge ──────────────────────────────────────────────────────────────
+# ── GPT-4o judge ─────────────────────────────────────────────────────────────
 
 JUDGE_PROMPT = """You are an expert evaluator for a small AI chatbot called Wagmi (watchdog of Deal ex Machina, a Paris-based tech consulting firm).
 
@@ -579,7 +579,7 @@ def run():
             print("done")
 
         # Step 2: Judge
-        print("\n[Step 2] Scoring with Claude judge ...")
+        print("\n[Step 2] Scoring with GPT-4o judge ...")
         scored = []
         for i, r in enumerate(results, 1):
             print(f"  Judging [{i:02d}/{len(results)}] {r['id']} ...", end=" ", flush=True)
