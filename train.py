@@ -5,6 +5,8 @@ import os
 import warnings
 from pathlib import Path
 
+MODEL_VERSION = (Path(__file__).resolve().parent / "VERSION").read_text().strip()
+
 os.environ["PYTHONUNBUFFERED"] = "1"
 
 # Auth (Qwen 2.5 14B 4-bit): keep compile disabled by default for stability.
@@ -115,6 +117,7 @@ def run():
             "PYTORCH_CUDA_ALLOC_CONF may include expandable_segments."
         )
     print(json.dumps({
+        "version": MODEL_VERSION,
         "profile": MODEL_PROFILE,
         "model": MODEL_ID, "lora_r": LORA_R, "lora_alpha": LORA_ALPHA,
         "lr": LEARNING_RATE, "epochs": NUM_EPOCHS,
@@ -240,9 +243,10 @@ def run():
         if not HF_TOKEN:
             print("WARNING: HF_TOKEN not set, skipping push to Hub.")
         else:
-            model.push_to_hub(HUB_MODEL_ID, token=HF_TOKEN, private=True)
-            tokenizer.push_to_hub(HUB_MODEL_ID, token=HF_TOKEN, private=True)
-            print(f"Adapter pushed to https://huggingface.co/{HUB_MODEL_ID}")
+            commit_msg = f"wagmi-sft v{MODEL_VERSION} ({MODEL_PROFILE})"
+            model.push_to_hub(HUB_MODEL_ID, token=HF_TOKEN, private=True, commit_message=commit_msg)
+            tokenizer.push_to_hub(HUB_MODEL_ID, token=HF_TOKEN, private=True, commit_message=commit_msg)
+            print(f"Adapter pushed to https://huggingface.co/{HUB_MODEL_ID} [{commit_msg}]")
 
     print("\nDone. Run baseline.py with the adapter to verify outputs.")
     return stats

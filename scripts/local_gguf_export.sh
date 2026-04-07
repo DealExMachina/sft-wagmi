@@ -3,14 +3,21 @@
 # Local GGUF export — runs on Mac (16 GB RAM is enough).
 #
 # Prereqs:
-#   brew install llama.cpp          # provides llama-quantize + convert_hf_to_gguf.py
-#   pip install huggingface_hub gguf numpy sentencepiece protobuf transformers torch
+#   brew install llama.cpp
+#   python3 -m venv .venv-gguf
+#   .venv-gguf/bin/pip install gguf@git+https://github.com/ggml-org/llama.cpp@b8680#subdirectory=gguf-py \
+#       numpy sentencepiece protobuf transformers torch huggingface_hub
 #
 # Usage:
 #   ./scripts/local_gguf_export.sh auth      # 14B model
 #   ./scripts/local_gguf_export.sh small     # 1.5B model
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+VENV="${SCRIPT_DIR}/.venv-gguf"
+VENV_PYTHON="${VENV}/bin/python3"
+HF_CLI="${VENV}/bin/hf"
 
 PROFILE="${1:-auth}"
 
@@ -42,25 +49,28 @@ echo "  GGUF repo:    ${HUB_GGUF}"
 echo "============================================================"
 
 # ── Preflight checks ─────────────────────────────────────────
-for cmd in llama-quantize convert_hf_to_gguf huggingface-cli python3; do
-  if ! command -v "$cmd" &>/dev/null; then
-    echo "ERROR: '$cmd' not found."
-    case "$cmd" in
-      llama-quantize|convert_hf_to_gguf)
-        echo "  Install: brew install llama.cpp" ;;
-      huggingface-cli)
-        echo "  Install: pip install huggingface_hub" ;;
-    esac
-    exit 1
-  fi
-done
+if ! command -v llama-quantize &>/dev/null; then
+  echo "ERROR: llama-quantize not found. Install: brew install llama.cpp"
+  exit 1
+fi
+if [ ! -f "${VENV_PYTHON}" ]; then
+  echo "ERROR: venv not found at ${VENV}"
+  echo "  Create it:"
+  echo "    python3 -m venv .venv-gguf"
+  echo "    .venv-gguf/bin/pip install 'gguf@git+https://github.com/ggml-org/llama.cpp@b8680#subdirectory=gguf-py' numpy sentencepiece protobuf transformers torch huggingface_hub"
+  exit 1
+fi
+
+CONVERT_SCRIPT="$(find /opt/homebrew/Cellar/llama.cpp -name 'convert_hf_to_gguf.py' 2>/dev/null | head -1)"
+if [ -z "${CONVERT_SCRIPT}" ]; then
+  echo "ERROR: convert_hf_to_gguf.py not found in llama.cpp Cellar"
+  exit 1
+fi
+echo "Using converter: ${CONVERT_SCRIPT}"
+echo "Using venv:      ${VENV}"
 
 if [ -z "${HF_TOKEN:-}" ]; then
-  HF_TOKEN="$(huggingface-cli whoami 2>/dev/null | head -1 || true)"
-  if [ -z "$HF_TOKEN" ]; then
-    echo "ERROR: HF_TOKEN not set and not logged in. Run: huggingface-cli login"
-    exit 1
-  fi
+  "${HF_CLI}" auth whoami &>/dev/null || { echo "ERROR: not logged in. Run: ${HF_CLI} auth login"; exit 1; }
   echo "Using cached HF credentials."
 fi
 
@@ -68,9 +78,8 @@ fi
 MERGED_DIR="${WORK_DIR}/merged"
 echo ""
 echo ">>> Downloading merged model from ${HUB_MERGED} ..."
-huggingface-cli download "${HUB_MERGED}" \
-  --local-dir "${MERGED_DIR}" \
-  --local-dir-use-symlinks False
+"${HF_CLI}" download "${HUB_MERGED}" \
+  --local-dir "${MERGED_DIR}"
 
 echo "    Downloaded to ${MERGED_DIR}"
 du -sh "${MERGED_DIR}"
@@ -79,7 +88,7 @@ du -sh "${MERGED_DIR}"
 BF16_GGUF="${WORK_DIR}/${ARTIFACT}-bf16.gguf"
 echo ""
 echo ">>> Converting to bf16 GGUF ..."
-convert_hf_to_gguf "${MERGED_DIR}" \
+"${VENV_PYTHON}" "${CONVERT_SCRIPT}" "${MERGED_DIR}" \
   --outfile "${BF16_GGUF}" \
   --outtype bf16
 
@@ -131,13 +140,13 @@ echo "    Modelfile written to ${MODELFILE}"
 # ── Step 5: Push GGUF + Modelfile to Hub ──────────────────────
 echo ""
 echo ">>> Creating repo ${HUB_GGUF} ..."
-huggingface-cli repo create "${HUB_GGUF}" --type model --private 2>/dev/null || true
+"${HF_CLI}" repos create "${HUB_GGUF}" --type model --private 2>/dev/null || true
 
 echo ">>> Uploading GGUF ($(du -h "${Q4_GGUF}" | cut -f1)) ..."
-huggingface-cli upload "${HUB_GGUF}" "${Q4_GGUF}" "${GGUF_FILENAME}"
+"${HF_CLI}" upload "${HUB_GGUF}" "${Q4_GGUF}" "${GGUF_FILENAME}"
 
 echo ">>> Uploading Modelfile ..."
-huggingface-cli upload "${HUB_GGUF}" "${MODELFILE}" "Modelfile.wagmi-sft"
+"${HF_CLI}" upload "${HUB_GGUF}" "${MODELFILE}" "Modelfile.wagmi-sft"
 
 echo ""
 echo "============================================================"

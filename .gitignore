@@ -2,6 +2,17 @@
 __pycache__/
 *.pyc
 .cache/
-*.gguf
-wagmi-qwen2.5-1.5b-sft*/
 .claude/
+.venv-gguf/
+
+# Large model artifacts -- never commit to GitHub.
+# Adapters, merged models, GGUF, safetensors, checkpoints all go to HF Hub.
+output/
+*.gguf
+*.safetensors
+*.bin
+wagmi-qwen2.5-1.5b-sft*/
+wagmi-qwen2.5-14b-sft*/
+
+# Jupyter executed notebooks
+*.executed.ipynb

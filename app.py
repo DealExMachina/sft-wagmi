@@ -86,8 +86,38 @@ def run_export_gguf(profile: str):
     yield from run_script("export_gguf.py", profile)
 
 
+def run_merge_next():
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "scripts/merge_next.py", "--bump", "minor"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+    )
+    output = ""
+    for line in iter(proc.stdout.readline, ""):
+        output += line
+        yield output
+    proc.wait()
+    if proc.returncode != 0:
+        output += f"\n\nProcess exited with code {proc.returncode}"
+    else:
+        output += "\n\nDone."
+    yield output
+
+
+def get_version():
+    version_file = os.path.join(os.path.dirname(__file__), "VERSION")
+    try:
+        with open(version_file) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return "?"
+
+
 with gr.Blocks(title="sft-wagmi") as demo:
-    gr.Markdown("# sft-wagmi")
+    gr.Markdown(f"# sft-wagmi v{get_version()}")
     gr.Markdown(f"**GPU:** {gpu_info()}")
     profile = gr.Radio(
         choices=PROFILE_CHOICES,
@@ -98,6 +128,16 @@ with gr.Blocks(title="sft-wagmi") as demo:
     gr.Markdown(
         "Note: this pipeline is text SFT only. You do not need to upload any image for training."
     )
+
+    with gr.Tab("0. Merge Next Data"):
+        gr.Markdown(
+            "**Merge `data/next/*.jsonl` into the training dataset.** "
+            "Validates schema, splits into train/eval (85/15), updates metadata, "
+            "bumps VERSION (minor). Run this before training if new entries are staged."
+        )
+        merge_btn = gr.Button("Merge & bump version", variant="primary")
+        merge_out = gr.Textbox(label="Output", lines=20, max_lines=50, autoscroll=True)
+        merge_btn.click(fn=run_merge_next, outputs=merge_out)
 
     with gr.Tab("1. Baseline"):
         gr.Markdown("Run baseline eval for the selected profile model (small or auth).")

@@ -1,4 +1,5 @@
 {
+  "version": "0.1.0",
   "generatedAt": "2026-04-05T11:46:51.077Z",
   "output": {
     "train": "datasets/wagmi-sft/train.jsonl",

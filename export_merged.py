@@ -10,6 +10,8 @@ from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 
+MODEL_VERSION = (Path(__file__).resolve().parent / "VERSION").read_text().strip()
+
 import torch
 from huggingface_hub import HfApi, create_repo
 from unsloth import FastLanguageModel
@@ -105,7 +107,7 @@ def run():
             folder_path=str(MERGED_DIR),
             repo_id=HUB_MERGED_REPO,
             repo_type="model",
-            commit_message=f"Merged {MODEL_PROFILE} model (bf16)",
+            commit_message=f"wagmi-sft v{MODEL_VERSION} ({MODEL_PROFILE}) merged bf16",
         )
         print(f"  Upload complete.")
     except Exception as e:

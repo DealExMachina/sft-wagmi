@@ -20,6 +20,8 @@ app_port: 7860
 
 ---
 
+**Current version: `0.1.0`** (see [CHANGELOG.md](CHANGELOG.md))
+
 Fine-tune [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) into **Wagmi**: a small quantized model that runs on CPU and answers questions about [Deal ex Machina](https://dealexmachina.com), its services, blog, and founder, in French and English, with guardrails against hallucination.
 
 The stack has three layers:
@@ -158,55 +160,95 @@ Quantized small build is on the order of **~1 GB** (Q4_K_M), CPU-friendly.
 
 ## One-command launcher
 
+Full pipeline (on L40 HF Space):
+
 ```bash
-python3 scripts/pipeline.py --all
+python3 scripts/pipeline.py --all --profile auth
 ```
+
+This runs: preflight -> merge `data/next/` -> train -> eval -> eval-rag -> export merged model to Hub.
 
 Useful variants:
 
 ```bash
-python3 scripts/pipeline.py --preflight
-python3 scripts/pipeline.py --sync-dataset
-python3 scripts/pipeline.py --profile small --train
+python3 scripts/pipeline.py --preflight --dry-run
+python3 scripts/pipeline.py --merge-next                    # merge data/next/ + bump version
+python3 scripts/pipeline.py --merge-next --bump patch       # patch bump instead of minor
 python3 scripts/pipeline.py --profile auth --train
-python3 scripts/pipeline.py --eval
-python3 scripts/pipeline.py --eval-rag
-python3 scripts/pipeline.py --eval-tools
-python3 scripts/pipeline.py --all --dry-run
+python3 scripts/pipeline.py --train --export-merged         # train + push merged model
+python3 scripts/pipeline.py --sync-dataset                  # sync from dexm-one-page
+python3 scripts/pipeline.py --autotune --profile auth       # requires OPENAI_API_KEY
+python3 scripts/pipeline.py --all --profile auth --dry-run  # preview full pipeline
+```
+
+After the Space completes, run locally on your Mac:
+
+```bash
+./scripts/local_gguf_export.sh auth   # download merged, convert GGUF, push to Hub
 ```
 
 Behavior:
 
-- **Steps** prefer root Python scripts (`baseline.py`, `train.py`, `autotune.py`, `eval_sft.py`, `eval_sft_rag.py`, `export_gguf.py`). If a script is missing, the launcher **falls back** to the matching `.ipynb` via `jupyter nbconvert --execute` when Jupyter is installed.
-- **`--sync-dataset`** runs `npm run dataset:wagmi:refresh` in `../dexm-one-page`.
-- **`--profile`**: `small` (Qwen 1.5B) or `auth` (Qwen 2.5 14B path); also `MODEL_PROFILE` env.
-- **`HF_TOKEN`**: Hub pull/push. **`OPENAI_API_KEY`**: autotune judge (and related evals if configured).
+- **`--all`** chains: preflight -> merge-next -> train -> eval -> eval-rag -> export-merged.
+- **`--merge-next`** runs `scripts/merge_next.py` which validates `data/next/*.jsonl`, appends to
+  train/eval (85/15 split), updates `metadata.json`, bumps `VERSION`, and clears `data/next/`.
+- **`--export-merged`** runs `export_merged.py` (LoRA merge + push to Hub). GGUF conversion is local.
+- **`--profile`**: `small` (Qwen 1.5B) or `auth` (Qwen 2.5 14B).
+- **`HF_TOKEN`**: Hub pull/push. **`OPENAI_API_KEY`**: autotune judge.
+- Large artifacts (adapters, merged models, GGUF) go to **HF Hub, not GitHub** (see `.gitignore`).
 
-**HF Spaces / Gradio:** `app.py` mirrors the same flow in a UI (see Space config in the YAML header above).
+**HF Spaces / Gradio:** `app.py` mirrors the same flow in a UI with a "0. Merge Next Data" tab.
+
+## Versioning
+
+Model versions follow [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
+
+- **MAJOR**: breaking persona change, base model swap, or schema change.
+- **MINOR**: new dataset entries, new training profiles, new capabilities.
+- **PATCH**: hyperparameter tweaks, bug fixes, tooling improvements.
+
+The current version lives in `VERSION` at the repo root. It is read by `train.py`
+at startup and embedded in Hub commit messages. See [CHANGELOG.md](CHANGELOG.md)
+for the full history.
+
+### Preparing a new version
+
+1. Drop new dataset entries into `data/next/` during development.
+2. When ready, merge them into `data/train.jsonl` / `data/eval.jsonl` (via the dexm
+   generator or manually).
+3. Bump `VERSION`, add a `CHANGELOG.md` entry, retrain, and push.
 
 ## Repository structure
 
 ```
 sft-wagmi/
 ├── data/
-│   ├── train.jsonl           # SFT training rows (JSONL chat format)
-│   ├── eval.jsonl            # Held-out eval rows
-│   └── metadata.json         # Counts + distribution (from dexm generator)
+│   ├── train.jsonl                  # SFT training rows (JSONL chat format)
+│   ├── eval.jsonl                   # Held-out eval rows
+│   ├── tooling_email_calendar.jsonl # Auth-profile tool-calling examples
+│   ├── metadata.json                # Counts + distribution + version
+│   └── next/                        # Staging area for next-version entries
 ├── scripts/
-│   ├── pipeline.py           # CLI orchestration (sync, train, eval, export)
-│   └── export_ollama.py      # Standalone merge + GGUF + Ollama import
-├── baseline.py               # Baseline eval (script)
-├── train.py                  # Unsloth SFT (script)
-├── autotune.py               # Judge loop (script)
-├── eval_sft.py               # Post-training eval
-├── eval_sft_rag.py           # Eval with RAG-style context
-├── export_gguf.py            # GGUF export + Hub (used by --export)
-├── retrain_step.py           # Helper for autotune merge/retrain
-├── app.py                    # Gradio Space entry
-├── baseline.ipynb            # Notebook alternative for baseline
-├── train.ipynb               # Notebook alternative for training
-├── autotune.ipynb            # Notebook alternative for autotune
+│   ├── pipeline.py                  # CLI orchestration (--all, --train, --export-merged ...)
+│   ├── merge_next.py                # Merge data/next/ into train/eval + bump VERSION
+│   ├── export_ollama.py             # Standalone merge + GGUF + Ollama import
+│   └── local_gguf_export.sh         # Local Mac GGUF conversion + quantization
+├── baseline.py                      # Baseline eval (script)
+├── train.py                         # Unsloth SFT (script)
+├── autotune.py                      # Judge loop (script)
+├── eval_sft.py                      # Post-training eval
+├── eval_sft_rag.py                  # Eval with RAG-style context
+├── eval_tool_calls.py               # Tool-calling eval
+├── export_gguf.py                   # GGUF export + Hub (Space, legacy)
+├── export_merged.py                 # LoRA merge + push merged model (Space)
+├── retrain_step.py                  # Helper for autotune merge/retrain
+├── app.py                           # Gradio Space entry
+├── baseline.ipynb                   # Notebook alternative for baseline
+├── train.ipynb                      # Notebook alternative for training
+├── autotune.ipynb                   # Notebook alternative for autotune
 ├── requirements.txt
+├── VERSION                          # Semver (e.g. 0.1.0)
+├── CHANGELOG.md                     # Version history
 └── README.md
 ```
 
