@@ -34,72 +34,16 @@ warnings.filterwarnings(
 )
 
 # ── Config ────────────────────────────────────────────────────────────────────
-MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
-LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
-if LLM_FAMILY not in {"qwen", "lfm2"}:
-    raise RuntimeError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+from config import resolve_family, resolve_profile, resolve_profile_config
 
+LLM_FAMILY = resolve_family()
+MODEL_PROFILE = resolve_profile()
+cfg = resolve_profile_config(LLM_FAMILY, MODEL_PROFILE)
 
-def _defaults(profile: str) -> dict[str, str]:
-    if LLM_FAMILY == "lfm2":
-        if profile == "small":
-            return {
-                "base_model_id": "unsloth/LFM2.5-1.2B-Instruct",
-                "hub_adapter": "jeanbaptdzd/wagmi-lfm2-small-sft",
-                "adapter_dir": "output/wagmi-lfm2-small-sft",
-                "max_seq_len": "2048",
-                "load_in_4bit": "false",
-            }
-        return {
-            "base_model_id": "unsloth/LFM2-8B-A1B",
-            "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
-            "adapter_dir": "output/wagmi-lfm2-auth-sft",
-            "max_seq_len": "2048",
-            "load_in_4bit": "true",
-        }
-    if profile == "small":
-        return {
-            "base_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
-            "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft",
-            "adapter_dir": "output/wagmi-qwen2.5-1.5b-sft",
-            "max_seq_len": "2048",
-            "load_in_4bit": "false",
-        }
-    return {
-        "base_model_id": "Qwen/Qwen2.5-14B-Instruct",
-        "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-14b-sft",
-        "adapter_dir": "output/wagmi-qwen2.5-14b-sft",
-        "max_seq_len": "2048",
-        "load_in_4bit": "true",
-    }
-
-
-SMALL_DEFAULTS = _defaults("small")
-AUTH_DEFAULTS = _defaults("auth")
-PROFILE_CONFIG = {
-    "small": {
-        "base_model_id": os.environ.get("SMALL_MODEL_ID", SMALL_DEFAULTS["base_model_id"]),
-        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", SMALL_DEFAULTS["hub_adapter"]),
-        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", SMALL_DEFAULTS["adapter_dir"]),
-        "max_seq_len": int(os.environ.get("SMALL_MAX_SEQ_LEN", SMALL_DEFAULTS["max_seq_len"])),
-        "load_in_4bit": os.environ.get("SMALL_LOAD_IN_4BIT", SMALL_DEFAULTS["load_in_4bit"]).lower() == "true",
-    },
-    "auth": {
-        "base_model_id": os.environ.get("AUTH_MODEL_ID", AUTH_DEFAULTS["base_model_id"]),
-        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", AUTH_DEFAULTS["hub_adapter"]),
-        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", AUTH_DEFAULTS["adapter_dir"]),
-        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", AUTH_DEFAULTS["max_seq_len"])),
-        "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", AUTH_DEFAULTS["load_in_4bit"]).lower() != "false",
-    },
-}
-if MODEL_PROFILE not in PROFILE_CONFIG:
-    raise RuntimeError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}")
-
-cfg = PROFILE_CONFIG[MODEL_PROFILE]
-BASE_MODEL_ID = cfg["base_model_id"]
-HUB_ADAPTER = cfg["hub_adapter"]
-ADAPTER_DIR = cfg["adapter_dir"]
-MAX_SEQ_LEN = int(cfg["max_seq_len"])
+BASE_MODEL_ID = cfg.model_id
+HUB_ADAPTER = cfg.hub_adapter
+ADAPTER_DIR = cfg.adapter_dir
+MAX_SEQ_LEN = cfg.max_seq_len
 DTYPE = torch.bfloat16
 
 PROFILE_GEN_KWARGS = {
@@ -521,7 +465,16 @@ def retrain_via_subprocess(train_path: Path, eval_path: Path, iteration: int):
     """Run training in a subprocess to isolate Unsloth's monkey-patching."""
     cmd = [sys.executable, "-u", "retrain_step.py", str(train_path), str(eval_path), str(iteration)]
     print(f"  Launching subprocess: {' '.join(cmd)}")
-    proc = subprocess.run(cmd, env={**os.environ, "PYTHONUNBUFFERED": "1"})
+    print(f"  Retrain env: LLM_FAMILY={LLM_FAMILY} MODEL_PROFILE={MODEL_PROFILE}")
+    proc = subprocess.run(
+        cmd,
+        env={
+            **os.environ,
+            "PYTHONUNBUFFERED": "1",
+            "LLM_FAMILY": LLM_FAMILY,
+            "MODEL_PROFILE": MODEL_PROFILE,
+        },
+    )
     if proc.returncode != 0:
         raise RuntimeError(f"Retrain subprocess failed with exit code {proc.returncode}")
     print(f"  Retrain subprocess completed successfully.")

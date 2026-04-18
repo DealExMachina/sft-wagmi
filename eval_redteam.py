@@ -25,25 +25,15 @@ VERSION_FILE = ROOT / "VERSION"
 CASES_FILE = ROOT / "data" / "redteam_guardrail_cases.json"
 REPORTS_ROOT = ROOT / "reports" / "redteam"
 
-MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
-PROFILE_CONFIG = {
-    "small": {
-        "base_model_id": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
-        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", "output/wagmi-qwen2.5-1.5b-sft"),
-        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"),
-    },
-    "auth": {
-        "base_model_id": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
-        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-qwen2.5-14b-sft"),
-        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-14b-sft"),
-    },
-}
-if MODEL_PROFILE not in PROFILE_CONFIG:
-    raise ValueError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}. Expected one of: {', '.join(PROFILE_CONFIG.keys())}")
+from config import resolve_family, resolve_profile, resolve_profile_config
 
-BASE_MODEL_ID = PROFILE_CONFIG[MODEL_PROFILE]["base_model_id"]
-ADAPTER_DIR = PROFILE_CONFIG[MODEL_PROFILE]["adapter_dir"]
-HUB_ADAPTER = PROFILE_CONFIG[MODEL_PROFILE]["hub_adapter"]
+LLM_FAMILY = resolve_family()
+MODEL_PROFILE = resolve_profile()
+cfg = resolve_profile_config(LLM_FAMILY, MODEL_PROFILE)
+
+BASE_MODEL_ID = cfg.model_id
+ADAPTER_DIR = cfg.adapter_dir
+HUB_ADAPTER = cfg.hub_adapter
 DTYPE = torch.bfloat16
 
 PROFILE_GEN_KWARGS = {

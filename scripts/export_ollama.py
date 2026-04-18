@@ -21,21 +21,17 @@ import sys
 import tempfile
 from pathlib import Path
 
-LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
-if LLM_FAMILY not in {"qwen", "lfm2"}:
-    raise ValueError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from config import resolve_family, resolve_profile, resolve_profile_config
 
-DEFAULT_ADAPTER_HUB_ID = "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"
-DEFAULT_BASE_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
-DEFAULT_OLLAMA_MODEL_NAME = "wagmi-sft"
-if LLM_FAMILY == "lfm2":
-    DEFAULT_ADAPTER_HUB_ID = "jeanbaptdzd/wagmi-lfm2-small-sft"
-    DEFAULT_BASE_MODEL_ID = "unsloth/LFM2.5-1.2B-Instruct"
-    DEFAULT_OLLAMA_MODEL_NAME = "wagmi-lfm2-small"
+LLM_FAMILY = resolve_family()
+MODEL_PROFILE = resolve_profile()
+cfg = resolve_profile_config(LLM_FAMILY, MODEL_PROFILE)
 
-ADAPTER_HUB_ID = os.environ.get("ADAPTER_HUB_ID", DEFAULT_ADAPTER_HUB_ID)
-BASE_MODEL_ID = os.environ.get("BASE_MODEL_ID", DEFAULT_BASE_MODEL_ID)
-OLLAMA_MODEL_NAME = os.environ.get("OLLAMA_MODEL_NAME", DEFAULT_OLLAMA_MODEL_NAME)
+ADAPTER_HUB_ID = os.environ.get("ADAPTER_HUB_ID", cfg.hub_adapter)
+BASE_MODEL_ID = os.environ.get("BASE_MODEL_ID", cfg.model_id)
+OLLAMA_MODEL_NAME = cfg.ollama_name
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 QUANTIZATION = os.environ.get("QUANTIZATION", "Q4_K_M")
 CACHE_DIR = Path(".cache/wagmi-merge")

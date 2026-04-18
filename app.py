@@ -23,7 +23,7 @@ import torch
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 PROFILE_CHOICES = ["small", "auth"]
-FAMILY_CHOICES = ["qwen", "lfm2"]
+FAMILY_CHOICES = ["qwen", "lfm2", "qwen3"]
 
 
 def gpu_info():
@@ -115,7 +115,7 @@ def run_full_pipeline(profile: str, family: str):
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
-        env={**os.environ, "PYTHONUNBUFFERED": "1", "LLM_FAMILY": family},
+        env={**os.environ, "PYTHONUNBUFFERED": "1", "LLM_FAMILY": family, "MODEL_PROFILE": profile},
     )
     output = ""
     for line in iter(proc.stdout.readline, ""):
@@ -151,7 +151,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
         choices=FAMILY_CHOICES,
         value="qwen",
         label="Model family",
-        info="qwen = existing Qwen2.5 path, lfm2 = LiquidAI LFM2/LFM2.5 path",
+        info="qwen = Qwen 2.5 path, qwen3 = Qwen 3 path, lfm2 = Liquid AI LFM2/LFM2.5 path",
     )
     gr.Markdown(
         "Note: this pipeline is text SFT only. You do not need to upload any image for training."
@@ -185,7 +185,8 @@ with gr.Blocks(title="sft-wagmi") as demo:
     with gr.Tab("2. Train"):
         gr.Markdown(
             "Fine-tune with LoRA/QLoRA on the Wagmi dataset. "
-            "small: Qwen 1.5B (fast). auth: Qwen 2.5 14B (stronger tool-calling)."
+            "Model family and profile are selected above. "
+            "small = anon-tier base model, auth = tool-capable authenticated-tier model."
         )
         train_btn = gr.Button("Run training", variant="primary")
         train_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)

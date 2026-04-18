@@ -17,90 +17,21 @@ import torch
 from huggingface_hub import HfApi, create_repo
 from unsloth import FastLanguageModel
 
-MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
-LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
-if LLM_FAMILY not in {"qwen", "lfm2"}:
-    raise ValueError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+from config import resolve_family, resolve_profile, resolve_profile_config
 
+LLM_FAMILY = resolve_family()
+MODEL_PROFILE = resolve_profile()
+cfg = resolve_profile_config(LLM_FAMILY, MODEL_PROFILE)
 
-def _profile_defaults(profile: str) -> dict[str, str]:
-    if LLM_FAMILY == "lfm2":
-        if profile == "small":
-            return {
-                "base_model_id": "unsloth/LFM2.5-1.2B-Instruct",
-                "hub_adapter": "jeanbaptdzd/wagmi-lfm2-small-sft",
-                "adapter_dir": "output/wagmi-lfm2-small-sft",
-                "hub_gguf_repo": "jeanbaptdzd/wagmi-lfm2-small-sft-gguf",
-                "artifact_prefix": "wagmi-lfm2-small-sft",
-            }
-        return {
-            "base_model_id": "unsloth/LFM2-8B-A1B",
-            "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
-            "adapter_dir": "output/wagmi-lfm2-auth-sft",
-            "hub_gguf_repo": "jeanbaptdzd/wagmi-lfm2-auth-sft-gguf",
-            "artifact_prefix": "wagmi-lfm2-auth-sft",
-        }
-    if profile == "small":
-        return {
-            "base_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
-            "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft",
-            "adapter_dir": "output/wagmi-qwen2.5-1.5b-sft",
-            "hub_gguf_repo": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft-gguf",
-            "artifact_prefix": "wagmi-qwen2.5-1.5b-sft",
-        }
-    return {
-        "base_model_id": "Qwen/Qwen2.5-14B-Instruct",
-        "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-14b-sft",
-        "adapter_dir": "output/wagmi-qwen2.5-14b-sft",
-        "hub_gguf_repo": "jeanbaptdzd/wagmi-qwen2.5-14b-sft-gguf",
-        "artifact_prefix": "wagmi-qwen2.5-14b-sft",
-    }
-
-
-SMALL_DEFAULTS = _profile_defaults("small")
-AUTH_DEFAULTS = _profile_defaults("auth")
-
-PROFILE_CONFIG = {
-    "small": {
-        "base_model_id": os.environ.get("SMALL_MODEL_ID", SMALL_DEFAULTS["base_model_id"]),
-        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", SMALL_DEFAULTS["hub_adapter"]),
-        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", SMALL_DEFAULTS["adapter_dir"]),
-        "hub_gguf_repo": os.environ.get("SMALL_HUB_GGUF_REPO", SMALL_DEFAULTS["hub_gguf_repo"]),
-        "artifact_prefix": os.environ.get("SMALL_ARTIFACT_PREFIX", SMALL_DEFAULTS["artifact_prefix"]),
-    },
-    "auth": {
-        "base_model_id": os.environ.get("AUTH_MODEL_ID", AUTH_DEFAULTS["base_model_id"]),
-        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", AUTH_DEFAULTS["hub_adapter"]),
-        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", AUTH_DEFAULTS["adapter_dir"]),
-        "hub_gguf_repo": os.environ.get("AUTH_HUB_GGUF_REPO", AUTH_DEFAULTS["hub_gguf_repo"]),
-        "artifact_prefix": os.environ.get("AUTH_ARTIFACT_PREFIX", AUTH_DEFAULTS["artifact_prefix"]),
-    },
-}
-if MODEL_PROFILE not in PROFILE_CONFIG:
-    raise ValueError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}. Expected one of: {', '.join(PROFILE_CONFIG.keys())}")
-
-cfg = PROFILE_CONFIG[MODEL_PROFILE]
-BASE_MODEL_ID = cfg["base_model_id"]
-HUB_ADAPTER = cfg["hub_adapter"]
-ADAPTER_DIR = cfg["adapter_dir"]
-# Align with dexm-one-page local Ollama defaults: wagmi-sft:latest vs wagmi-sft-14b:latest
-OLLAMA_MODEL_NAME = os.environ.get(
-    "OLLAMA_MODEL_NAME",
-    (
-        "wagmi-lfm2-auth"
-        if LLM_FAMILY == "lfm2" and MODEL_PROFILE == "auth"
-        else "wagmi-lfm2-small"
-        if LLM_FAMILY == "lfm2"
-        else "wagmi-sft-14b"
-        if MODEL_PROFILE == "auth"
-        else "wagmi-sft"
-    ),
-)
-MAX_SEQ_LEN = 2048
+BASE_MODEL_ID = cfg.model_id
+HUB_ADAPTER = cfg.hub_adapter
+ADAPTER_DIR = cfg.adapter_dir
+OLLAMA_MODEL_NAME = cfg.ollama_name
+MAX_SEQ_LEN = cfg.max_seq_len
 DTYPE = torch.bfloat16
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
-HUB_GGUF_REPO = cfg["hub_gguf_repo"]
+HUB_GGUF_REPO = cfg.hub_gguf
 
 GGUF_DIR = Path(f"output/{MODEL_PROFILE}-gguf")
 QUANT = "q4_k_m"

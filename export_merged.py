@@ -16,72 +16,19 @@ import torch
 from huggingface_hub import HfApi, create_repo
 from unsloth import FastLanguageModel
 
-MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
-LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
-if LLM_FAMILY not in {"qwen", "lfm2"}:
-    raise ValueError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+from config import resolve_family, resolve_profile, resolve_profile_config
 
+LLM_FAMILY = resolve_family()
+MODEL_PROFILE = resolve_profile()
+cfg = resolve_profile_config(LLM_FAMILY, MODEL_PROFILE)
 
-def _defaults(profile: str) -> dict[str, str]:
-    if LLM_FAMILY == "lfm2":
-        if profile == "small":
-            return {
-                "base_model_id": "unsloth/LFM2.5-1.2B-Instruct",
-                "hub_adapter": "jeanbaptdzd/wagmi-lfm2-small-sft",
-                "adapter_dir": "output/wagmi-lfm2-small-sft",
-                "hub_merged_repo": "jeanbaptdzd/wagmi-lfm2-small-sft-merged",
-                "artifact_prefix": "wagmi-lfm2-small-sft",
-            }
-        return {
-            "base_model_id": "unsloth/LFM2-8B-A1B",
-            "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
-            "adapter_dir": "output/wagmi-lfm2-auth-sft",
-            "hub_merged_repo": "jeanbaptdzd/wagmi-lfm2-auth-sft-merged",
-            "artifact_prefix": "wagmi-lfm2-auth-sft",
-        }
-    if profile == "small":
-        return {
-            "base_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
-            "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft",
-            "adapter_dir": "output/wagmi-qwen2.5-1.5b-sft",
-            "hub_merged_repo": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft-merged",
-            "artifact_prefix": "wagmi-qwen2.5-1.5b-sft",
-        }
-    return {
-        "base_model_id": "Qwen/Qwen2.5-14B-Instruct",
-        "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-14b-sft",
-        "adapter_dir": "output/wagmi-qwen2.5-14b-sft",
-        "hub_merged_repo": "jeanbaptdzd/wagmi-qwen2.5-14b-sft-merged",
-        "artifact_prefix": "wagmi-qwen2.5-14b-sft",
-    }
-
-
-SMALL_DEFAULTS = _defaults("small")
-AUTH_DEFAULTS = _defaults("auth")
-PROFILE_CONFIG = {
-    "small": {
-        "base_model_id": os.environ.get("SMALL_MODEL_ID", SMALL_DEFAULTS["base_model_id"]),
-        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", SMALL_DEFAULTS["hub_adapter"]),
-        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", SMALL_DEFAULTS["adapter_dir"]),
-        "hub_merged_repo": os.environ.get("SMALL_HUB_MERGED_REPO", SMALL_DEFAULTS["hub_merged_repo"]),
-        "artifact_prefix": os.environ.get("SMALL_ARTIFACT_PREFIX", SMALL_DEFAULTS["artifact_prefix"]),
-    },
-    "auth": {
-        "base_model_id": os.environ.get("AUTH_MODEL_ID", AUTH_DEFAULTS["base_model_id"]),
-        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", AUTH_DEFAULTS["hub_adapter"]),
-        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", AUTH_DEFAULTS["adapter_dir"]),
-        "hub_merged_repo": os.environ.get("AUTH_HUB_MERGED_REPO", AUTH_DEFAULTS["hub_merged_repo"]),
-        "artifact_prefix": os.environ.get("AUTH_ARTIFACT_PREFIX", AUTH_DEFAULTS["artifact_prefix"]),
-    },
-}
-if MODEL_PROFILE not in PROFILE_CONFIG:
-    raise ValueError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}. Expected: {', '.join(PROFILE_CONFIG.keys())}")
-
-cfg = PROFILE_CONFIG[MODEL_PROFILE]
-BASE_MODEL_ID = cfg["base_model_id"]
-HUB_ADAPTER = cfg["hub_adapter"]
-ADAPTER_DIR = cfg["adapter_dir"]
-HUB_MERGED_REPO = cfg["hub_merged_repo"]
+BASE_MODEL_ID = cfg.model_id
+HUB_ADAPTER = cfg.hub_adapter
+ADAPTER_DIR = cfg.adapter_dir
+HUB_MERGED_REPO = os.environ.get(
+    "SMALL_HUB_MERGED_REPO" if MODEL_PROFILE == "small" else "AUTH_HUB_MERGED_REPO",
+    cfg.hub_merged,
+)
 MAX_SEQ_LEN = 2048
 DTYPE = torch.bfloat16
 

@@ -113,7 +113,7 @@ def load_env_file(env_path: Path) -> None:
             os.environ[key] = value
 
 
-def run_notebook(notebook_key: str, dry_run: bool, profile: str) -> int:
+def run_notebook(notebook_key: str, dry_run: bool, profile: str, family: str) -> int:
     notebook = NOTEBOOKS[notebook_key]
     output_name = f"{notebook.stem}.executed.ipynb"
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
@@ -132,29 +132,29 @@ def run_notebook(notebook_key: str, dry_run: bool, profile: str) -> int:
         ],
         cwd=ROOT,
         dry_run=dry_run,
-        extra_env={"MODEL_PROFILE": profile, "LLM_FAMILY": os.environ.get("LLM_FAMILY", "qwen")},
+        extra_env={"MODEL_PROFILE": profile, "LLM_FAMILY": family},
     )
 
 
-def run_python_step(step_key: str, dry_run: bool, profile: str) -> int:
+def run_python_step(step_key: str, dry_run: bool, profile: str, family: str) -> int:
     script = SCRIPT_STEPS[step_key]
     return run_cmd(
         ["python3", str(script)],
         cwd=ROOT,
         dry_run=dry_run,
-        extra_env={"MODEL_PROFILE": profile, "LLM_FAMILY": os.environ.get("LLM_FAMILY", "qwen")},
+        extra_env={"MODEL_PROFILE": profile, "LLM_FAMILY": family},
     )
 
 
-def run_pipeline_step(step_key: str, dry_run: bool, profile: str) -> int:
+def run_pipeline_step(step_key: str, dry_run: bool, profile: str, family: str) -> int:
     if SCRIPT_STEPS[step_key].exists():
-        return run_python_step(step_key, dry_run, profile)
+        return run_python_step(step_key, dry_run, profile, family)
     if step_key in NOTEBOOKS and NOTEBOOKS[step_key].exists():
         print(f"  [warn] {SCRIPT_STEPS[step_key].name} missing, falling back to notebook.")
         if not command_exists("jupyter"):
             print("  Cannot fallback to notebook: jupyter is not installed.")
             return 1
-        return run_notebook(step_key, dry_run, profile)
+        return run_notebook(step_key, dry_run, profile, family)
     print(f"  [missing] No runnable artifact for step '{step_key}'")
     return 1
 
@@ -318,47 +318,47 @@ def main() -> int:
 
     if do_baseline:
         print_header(f"Baseline evaluation ({profile})")
-        if run_pipeline_step("baseline", args.dry_run, profile) != 0:
+        if run_pipeline_step("baseline", args.dry_run, profile, family) != 0:
             return 1
 
     if do_train:
         print_header(f"SFT training ({profile})")
-        if run_pipeline_step("train", args.dry_run, profile) != 0:
+        if run_pipeline_step("train", args.dry_run, profile, family) != 0:
             return 1
 
     if do_autotune:
         print_header(f"Autotune ({profile})")
-        if run_pipeline_step("autotune", args.dry_run, profile) != 0:
+        if run_pipeline_step("autotune", args.dry_run, profile, family) != 0:
             return 1
 
     if do_eval:
         print_header(f"Eval SFT ({profile})")
-        if run_pipeline_step("eval", args.dry_run, profile) != 0:
+        if run_pipeline_step("eval", args.dry_run, profile, family) != 0:
             return 1
 
     if do_eval_rag:
         print_header(f"Eval SFT + RAG ({profile})")
-        if run_pipeline_step("eval-rag", args.dry_run, profile) != 0:
+        if run_pipeline_step("eval-rag", args.dry_run, profile, family) != 0:
             return 1
 
     if do_eval_tools:
         print_header(f"Eval Tool Calls ({profile})")
-        if run_pipeline_step("eval-tools", args.dry_run, profile) != 0:
+        if run_pipeline_step("eval-tools", args.dry_run, profile, family) != 0:
             return 1
 
     if do_redteam:
         print_header(f"Red Team Guardrails ({profile})")
-        if run_pipeline_step("redteam", args.dry_run, profile) != 0:
+        if run_pipeline_step("redteam", args.dry_run, profile, family) != 0:
             return 1
 
     if do_export_merged:
         print_header(f"Export merged model ({profile})")
-        if run_pipeline_step("export-merged", args.dry_run, profile) != 0:
+        if run_pipeline_step("export-merged", args.dry_run, profile, family) != 0:
             return 1
 
     if do_export_gguf:
         print_header(f"Export GGUF — legacy ({profile})")
-        if run_pipeline_step("export-gguf", args.dry_run, profile) != 0:
+        if run_pipeline_step("export-gguf", args.dry_run, profile, family) != 0:
             return 1
 
     version = get_version()

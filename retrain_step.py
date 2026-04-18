@@ -16,6 +16,7 @@ from datasets import load_dataset
 from transformers import TrainingArguments
 from unsloth import FastLanguageModel
 from trl import SFTTrainer
+from config import print_device_info, resolve_family, resolve_profile, resolve_profile_config
 
 warnings.filterwarnings(
     "ignore",
@@ -23,105 +24,25 @@ warnings.filterwarnings(
     category=FutureWarning,
 )
 
-MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
-LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
-if LLM_FAMILY not in {"qwen", "lfm2"}:
-    raise RuntimeError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+LLM_FAMILY = resolve_family()
+MODEL_PROFILE = resolve_profile()
+cfg = resolve_profile_config(LLM_FAMILY, MODEL_PROFILE)
 
-
-def _defaults(profile: str) -> dict[str, str]:
-    if LLM_FAMILY == "lfm2":
-        if profile == "small":
-            return {
-                "base_model_id": "unsloth/LFM2.5-1.2B-Instruct",
-                "hub_adapter": "jeanbaptdzd/wagmi-lfm2-small-sft",
-                "output_dir": "output/wagmi-lfm2-small-sft",
-                "max_seq_len": "2048",
-                "load_in_4bit": "false",
-            }
-        return {
-            "base_model_id": "unsloth/LFM2-8B-A1B",
-            "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
-            "output_dir": "output/wagmi-lfm2-auth-sft",
-            "max_seq_len": "2048",
-            "load_in_4bit": "true",
-        }
-    if profile == "small":
-        return {
-            "base_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
-            "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft",
-            "output_dir": "output/wagmi-qwen2.5-1.5b-sft",
-            "max_seq_len": "2048",
-            "load_in_4bit": "false",
-        }
-    return {
-        "base_model_id": "Qwen/Qwen2.5-14B-Instruct",
-        "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-14b-sft",
-        "output_dir": "output/wagmi-qwen2.5-14b-sft",
-        "max_seq_len": "2048",
-        "load_in_4bit": "true",
-    }
-
-
-SMALL_DEFAULTS = _defaults("small")
-AUTH_DEFAULTS = _defaults("auth")
-PROFILES = {
-    "small": {
-        "base_model_id": os.environ.get("SMALL_MODEL_ID", SMALL_DEFAULTS["base_model_id"]),
-        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", SMALL_DEFAULTS["hub_adapter"]),
-        "output_dir": os.environ.get("SMALL_OUTPUT_DIR", SMALL_DEFAULTS["output_dir"]),
-        "max_seq_len": int(os.environ.get("SMALL_MAX_SEQ_LEN", SMALL_DEFAULTS["max_seq_len"])),
-        "load_in_4bit": os.environ.get("SMALL_LOAD_IN_4BIT", SMALL_DEFAULTS["load_in_4bit"]).lower() == "true",
-        "lora_r": int(os.environ.get("SMALL_LORA_R", "32")),
-        "lora_alpha": int(os.environ.get("SMALL_LORA_ALPHA", "64")),
-        "learning_rate": float(os.environ.get("SMALL_LEARNING_RATE", "5e-5")),
-        "num_epochs": int(os.environ.get("SMALL_NUM_EPOCHS", "3")),
-        "per_device_batch": int(os.environ.get("SMALL_PER_DEVICE_BATCH", "4")),
-        "grad_accum": int(os.environ.get("SMALL_GRAD_ACCUM", "2")),
-        "dataset_num_proc": int(os.environ.get("SMALL_DATASET_NUM_PROC", "2")),
-    },
-    "auth": {
-        "base_model_id": os.environ.get("AUTH_MODEL_ID", AUTH_DEFAULTS["base_model_id"]),
-        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", AUTH_DEFAULTS["hub_adapter"]),
-        "output_dir": os.environ.get("AUTH_OUTPUT_DIR", AUTH_DEFAULTS["output_dir"]),
-        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", AUTH_DEFAULTS["max_seq_len"])),
-        "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", AUTH_DEFAULTS["load_in_4bit"]).lower() != "false",
-        "lora_r": int(os.environ.get("AUTH_LORA_R", "32")),
-        "lora_alpha": int(os.environ.get("AUTH_LORA_ALPHA", "64")),
-        "learning_rate": float(os.environ.get("AUTH_LEARNING_RATE", "2e-5")),
-        "num_epochs": int(os.environ.get("AUTH_NUM_EPOCHS", "2")),
-        "per_device_batch": int(os.environ.get("AUTH_PER_DEVICE_BATCH", "1")),
-        "grad_accum": int(os.environ.get("AUTH_GRAD_ACCUM", "8")),
-        "dataset_num_proc": int(os.environ.get("AUTH_DATASET_NUM_PROC", "1")),
-    },
-}
-if MODEL_PROFILE not in PROFILES:
-    raise RuntimeError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}")
-
-cfg = PROFILES[MODEL_PROFILE]
-BASE_MODEL_ID = cfg["base_model_id"]
-HUB_ADAPTER = cfg["hub_adapter"]
-OUTPUT_DIR = Path(cfg["output_dir"])
-MAX_SEQ_LEN = int(cfg["max_seq_len"])
+BASE_MODEL_ID = cfg.model_id
+HUB_ADAPTER = cfg.hub_adapter
+OUTPUT_DIR = Path(cfg.adapter_dir)
+MAX_SEQ_LEN = cfg.max_seq_len
 DTYPE = torch.bfloat16
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 
-LORA_R = int(cfg["lora_r"])
-LORA_ALPHA = int(cfg["lora_alpha"])
+LORA_R = cfg.lora_r
+LORA_ALPHA = cfg.lora_alpha
 TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-LEARNING_RATE = float(cfg["learning_rate"])
-NUM_EPOCHS = int(cfg["num_epochs"])
-PER_DEVICE_BATCH = int(cfg["per_device_batch"])
-GRAD_ACCUM = int(cfg["grad_accum"])
-DATASET_NUM_PROC = int(cfg["dataset_num_proc"])
-
-
-def _print_device_info() -> None:
-    if torch.cuda.is_available():
-        print(f"GPU: {torch.cuda.get_device_name(0)}")
-        print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
-    else:
-        print("GPU: none detected (CPU-only mode)")
+LEARNING_RATE = cfg.learning_rate
+NUM_EPOCHS = cfg.num_epochs
+PER_DEVICE_BATCH = cfg.per_device_batch
+GRAD_ACCUM = cfg.grad_accum
+DATASET_NUM_PROC = cfg.dataset_num_proc
 
 
 def main():
@@ -129,7 +50,7 @@ def main():
     eval_path = sys.argv[2]
     iteration = int(sys.argv[3])
 
-    _print_device_info()
+    print_device_info()
     print(f"Family: {LLM_FAMILY}")
     print(f"Profile: {MODEL_PROFILE}")
     print(f"Retrain step: iteration {iteration}")

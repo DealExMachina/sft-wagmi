@@ -17,27 +17,14 @@ warnings.filterwarnings(
 )
 
 # ── Config ─────────────────────────────────────────────────────────────────
-MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
-LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
-if LLM_FAMILY not in {"qwen", "lfm2"}:
-    raise ValueError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+from config import resolve_family, resolve_profile, resolve_profile_config
 
+LLM_FAMILY = resolve_family()
+MODEL_PROFILE = resolve_profile()
+cfg = resolve_profile_config(LLM_FAMILY, MODEL_PROFILE)
 
-def _default_model_id(profile: str) -> str:
-    if LLM_FAMILY == "lfm2":
-        return "unsloth/LFM2-8B-A1B" if profile == "auth" else "unsloth/LFM2.5-1.2B-Instruct"
-    return "Qwen/Qwen2.5-14B-Instruct" if profile == "auth" else "Qwen/Qwen2.5-1.5B-Instruct"
-
-
-PROFILE_MODEL_IDS = {
-    "small": os.environ.get("SMALL_MODEL_ID", _default_model_id("small")),
-    "auth": os.environ.get("AUTH_MODEL_ID", _default_model_id("auth")),
-}
-if MODEL_PROFILE not in PROFILE_MODEL_IDS:
-    raise ValueError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}. Expected one of: {', '.join(PROFILE_MODEL_IDS.keys())}")
-
-MODEL_ID = PROFILE_MODEL_IDS[MODEL_PROFILE]
-MAX_SEQ_LEN = 2048
+MODEL_ID = cfg.model_id
+MAX_SEQ_LEN = cfg.max_seq_len
 DTYPE = torch.bfloat16
 OUTPUT_FILE = Path(f"output/{MODEL_PROFILE}_baseline_results.json")
 
