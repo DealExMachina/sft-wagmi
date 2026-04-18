@@ -1,8 +1,18 @@
-"""Minimal Gradio UI for triggering baseline eval and SFT training."""
+"""Minimal Gradio UI for triggering baseline eval and SFT training.
+
+Hugging Face Docker Space constraints (see hub docs: Spaces / Docker):
+- The process must listen on the port declared as ``app_port`` in README front matter
+  (here: 7860). Gradio also reads ``GRADIO_SERVER_PORT`` / ``PORT`` if set — keep them
+  aligned with ``app_port`` or the proxy will not reach the app.
+- Bind on ``0.0.0.0`` (``GRADIO_SERVER_NAME``) so the platform can route inbound traffic.
+- Overlapping restarts can briefly leave the old process holding the port; we wait before bind.
+"""
 
 import os
+import socket
 import subprocess
 import sys
+import time
 
 # Match Dockerfile: Triton/torchao must not use /.triton when HOME is / (e.g. HF Spaces).
 cache_base = os.environ.get("CACHE_BASE_DIR", "/data")
@@ -138,6 +148,29 @@ def get_version():
         return "?"
 
 
+def _docker_space_listen_port() -> int:
+    """Port Gradio binds to — must match README ``app_port`` for Docker Spaces."""
+    for key in ("GRADIO_SERVER_PORT", "PORT"):
+        raw = os.environ.get(key)
+        if raw is not None and str(raw).strip() != "":
+            return int(str(raw).strip(), 10)
+    return 7860
+
+
+def _wait_until_port_free(port: int, *, host: str = "0.0.0.0", timeout_s: float = 90.0) -> None:
+    """Avoid OSError when HF restarts overlap and the previous listener still holds the port."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind((host, port))
+            return
+        except OSError:
+            time.sleep(0.75)
+    raise RuntimeError(f"Port {port} still in use on {host!r} after {timeout_s:.0f}s")
+
+
 with gr.Blocks(title="sft-wagmi") as demo:
     gr.Markdown(f"# sft-wagmi v{get_version()}")
     gr.Markdown(f"**GPU:** {gpu_info()}")
@@ -244,4 +277,12 @@ with gr.Blocks(title="sft-wagmi") as demo:
 
 
 if __name__ == "__main__":
-    demo.queue().launch(server_name="0.0.0.0", server_port=7860)
+    listen_host = os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0").strip() or "0.0.0.0"
+    listen_port = _docker_space_listen_port()
+    print(
+        f"Gradio launch: server_name={listen_host!r} server_port={listen_port} "
+        f"(HF Docker: align with README app_port; optional env GRADIO_SERVER_PORT / PORT)",
+        flush=True,
+    )
+    _wait_until_port_free(listen_port, host=listen_host)
+    demo.queue().launch(server_name=listen_host, server_port=listen_port)
