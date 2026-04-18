@@ -29,7 +29,7 @@ from unsloth import FastLanguageModel
 import torch
 from datasets import concatenate_datasets, load_dataset
 from transformers import TrainingArguments
-from trl import SFTTrainer
+from sft_trainer_compat import build_sft_trainer
 from config import print_device_info, resolve_family, resolve_profile, resolve_profile_config
 
 warnings.filterwarnings(
@@ -156,45 +156,44 @@ def run():
     dl_workers = 0 if MODEL_PROFILE == "auth" else 2
 
     # ── Train ──────────────────────────────────────────────────────────────
-    trainer = SFTTrainer(
+    training_args = TrainingArguments(
+        output_dir=OUTPUT_DIR,
+        num_train_epochs=NUM_EPOCHS,
+        per_device_train_batch_size=PER_DEVICE_BATCH,
+        per_device_eval_batch_size=PER_DEVICE_BATCH,
+        gradient_accumulation_steps=GRAD_ACCUM,
+        learning_rate=LEARNING_RATE,
+        lr_scheduler_type=LR_SCHEDULER,
+        warmup_steps=max(1, int((len(train_ds) / max(1, PER_DEVICE_BATCH * GRAD_ACCUM)) * NUM_EPOCHS * WARMUP_RATIO)),
+        weight_decay=WEIGHT_DECAY,
+        max_grad_norm=MAX_GRAD_NORM,
+        bf16=BF16,
+        fp16=FP16,
+        optim="adamw_8bit",
+        logging_steps=LOGGING_STEPS,
+        save_strategy="epoch",
+        save_total_limit=2,
+        eval_strategy="epoch",
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
+        report_to="none",
+        run_name=os.environ.get(
+            "SMALL_RUN_NAME" if MODEL_PROFILE == "small" else "AUTH_RUN_NAME",
+            cfg.run_name,
+        ),
+        seed=42,
+        dataloader_num_workers=dl_workers,
+        dataloader_pin_memory=(dl_workers > 0),
+    )
+    trainer = build_sft_trainer(
         model=model,
         tokenizer=tokenizer,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        dataset_text_field="text",
-        max_seq_length=MAX_SEQ_LEN,
+        training_args=training_args,
+        max_seq_len=MAX_SEQ_LEN,
         dataset_num_proc=DATASET_NUM_PROC,
-        packing=False,
-        args=TrainingArguments(
-            output_dir=OUTPUT_DIR,
-            num_train_epochs=NUM_EPOCHS,
-            per_device_train_batch_size=PER_DEVICE_BATCH,
-            per_device_eval_batch_size=PER_DEVICE_BATCH,
-            gradient_accumulation_steps=GRAD_ACCUM,
-            learning_rate=LEARNING_RATE,
-            lr_scheduler_type=LR_SCHEDULER,
-            warmup_steps=max(1, int((len(train_ds) / max(1, PER_DEVICE_BATCH * GRAD_ACCUM)) * NUM_EPOCHS * WARMUP_RATIO)),
-            weight_decay=WEIGHT_DECAY,
-            max_grad_norm=MAX_GRAD_NORM,
-            bf16=BF16,
-            fp16=FP16,
-            optim="adamw_8bit",
-            logging_steps=LOGGING_STEPS,
-            save_strategy="epoch",
-            save_total_limit=2,
-            eval_strategy="epoch",
-            load_best_model_at_end=True,
-            metric_for_best_model="eval_loss",
-            greater_is_better=False,
-            report_to="none",
-            run_name=os.environ.get(
-                "SMALL_RUN_NAME" if MODEL_PROFILE == "small" else "AUTH_RUN_NAME",
-                cfg.run_name,
-            ),
-            seed=42,
-            dataloader_num_workers=dl_workers,
-            dataloader_pin_memory=(dl_workers > 0),
-        ),
     )
 
     print("\nStarting training...")

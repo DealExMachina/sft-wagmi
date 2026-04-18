@@ -58,10 +58,10 @@ def main() -> None:
     import torch
     from datasets import load_dataset
     from transformers import TrainingArguments
-    from trl import SFTTrainer
     from unsloth import FastLanguageModel
 
     from config import print_device_info, resolve_family, resolve_profile, resolve_profile_config
+    from sft_trainer_compat import build_sft_trainer
 
     warnings.filterwarnings(
         "ignore",
@@ -141,44 +141,43 @@ def main() -> None:
 
     out_dir = str(output_dir) + f"_iter{iteration}"
 
-    trainer = SFTTrainer(
+    training_args = TrainingArguments(
+        output_dir=out_dir,
+        num_train_epochs=num_epochs,
+        per_device_train_batch_size=per_device_batch,
+        per_device_eval_batch_size=per_device_batch,
+        gradient_accumulation_steps=grad_accum,
+        learning_rate=learning_rate,
+        lr_scheduler_type="cosine",
+        warmup_steps=max(
+            1,
+            int((len(train_ds) / max(1, per_device_batch * grad_accum)) * num_epochs * 0.05),
+        ),
+        weight_decay=0.01,
+        max_grad_norm=1.0,
+        bf16=True,
+        fp16=False,
+        optim="adamw_8bit",
+        logging_steps=10,
+        save_strategy="epoch",
+        eval_strategy="epoch",
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
+        report_to="none",
+        run_name=f"wagmi-{model_profile}-autotune-iter{iteration}",
+        seed=42,
+        dataloader_num_workers=(0 if model_profile == "auth" else 2),
+        dataloader_pin_memory=(model_profile != "auth"),
+    )
+    trainer = build_sft_trainer(
         model=model,
         tokenizer=tokenizer,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        dataset_text_field="text",
-        max_seq_length=max_seq_len,
+        training_args=training_args,
+        max_seq_len=max_seq_len,
         dataset_num_proc=dataset_num_proc,
-        packing=False,
-        args=TrainingArguments(
-            output_dir=out_dir,
-            num_train_epochs=num_epochs,
-            per_device_train_batch_size=per_device_batch,
-            per_device_eval_batch_size=per_device_batch,
-            gradient_accumulation_steps=grad_accum,
-            learning_rate=learning_rate,
-            lr_scheduler_type="cosine",
-            warmup_steps=max(
-                1,
-                int((len(train_ds) / max(1, per_device_batch * grad_accum)) * num_epochs * 0.05),
-            ),
-            weight_decay=0.01,
-            max_grad_norm=1.0,
-            bf16=True,
-            fp16=False,
-            optim="adamw_8bit",
-            logging_steps=10,
-            save_strategy="epoch",
-            eval_strategy="epoch",
-            load_best_model_at_end=True,
-            metric_for_best_model="eval_loss",
-            greater_is_better=False,
-            report_to="none",
-            run_name=f"wagmi-{model_profile}-autotune-iter{iteration}",
-            seed=42,
-            dataloader_num_workers=(0 if model_profile == "auth" else 2),
-            dataloader_pin_memory=(model_profile != "auth"),
-        ),
     )
 
     print("\nStarting training...")
