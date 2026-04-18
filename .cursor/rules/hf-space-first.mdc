@@ -1,0 +1,12 @@
+---
+description: Run and verify training tasks on HF Space by default
+alwaysApply: true
+---
+
+# HF Space First
+
+- For execution requests in this repo (train/eval/pipeline), assume the target is the Hugging Face Space unless the user explicitly says local.
+- Before running commands, confirm the execution surface in one sentence (HF Space vs local).
+- Do not run local substitutes when the user asked for Space execution.
+- If remote execution cannot be performed directly, stop and provide exact Space steps/log checks instead of silently running local.
+- When troubleshooting Space crashes, prioritize `app.py` startup/runtime fixes and Space logs over local environment debugging.

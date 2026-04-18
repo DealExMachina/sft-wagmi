@@ -5,7 +5,7 @@ Hugging Face Docker Space constraints (see hub docs: Spaces / Docker):
   (here: 7860). Gradio also reads ``GRADIO_SERVER_PORT`` / ``PORT`` if set — keep them
   aligned with ``app_port`` or the proxy will not reach the app.
 - Bind on ``0.0.0.0`` (``GRADIO_SERVER_NAME``) so the platform can route inbound traffic.
-- Overlapping restarts can briefly leave the old process holding the port; we wait before bind.
+- Overlapping restarts can leave stale listeners; we probe/cleanup before bind.
 """
 
 import os
@@ -157,18 +157,57 @@ def _docker_space_listen_port() -> int:
     return 7860
 
 
-def _wait_until_port_free(port: int, *, host: str = "0.0.0.0", timeout_s: float = 90.0) -> None:
-    """Avoid OSError when HF restarts overlap and the previous listener still holds the port."""
+def _wait_until_port_free(port: int, *, host: str = "0.0.0.0", timeout_s: float = 90.0) -> bool:
+    """Best-effort wait for an available TCP port before Gradio launch."""
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind((host, port))
-            return
+            return True
         except OSError:
             time.sleep(0.75)
-    raise RuntimeError(f"Port {port} still in use on {host!r} after {timeout_s:.0f}s")
+    return False
+
+
+def _list_listening_pids(port: int) -> list[int]:
+    """Return PIDs listening on ``port`` (best effort; empty on failure)."""
+    try:
+        out = subprocess.check_output(
+            ["lsof", "-t", f"-iTCP:{port}", "-sTCP:LISTEN"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    pids: list[int] = []
+    for raw in out.splitlines():
+        raw = raw.strip()
+        if raw.isdigit():
+            pid = int(raw)
+            if pid != os.getpid():
+                pids.append(pid)
+    return pids
+
+
+def _terminate_stale_listeners(port: int) -> None:
+    """Terminate stale listeners to break HF restart loops (best effort)."""
+    pids = _list_listening_pids(port)
+    if not pids:
+        return
+    print(f"Port {port}: terminating stale listeners {pids}", flush=True)
+    for pid in pids:
+        try:
+            os.kill(pid, 15)  # SIGTERM
+        except OSError:
+            pass
+    time.sleep(2.0)
+    for pid in _list_listening_pids(port):
+        try:
+            os.kill(pid, 9)  # SIGKILL
+        except OSError:
+            pass
 
 
 with gr.Blocks(title="sft-wagmi") as demo:
@@ -284,5 +323,15 @@ if __name__ == "__main__":
         f"(HF Docker: align with README app_port; optional env GRADIO_SERVER_PORT / PORT)",
         flush=True,
     )
-    _wait_until_port_free(listen_port, host=listen_host)
+    if not _wait_until_port_free(listen_port, host=listen_host):
+        print(
+            f"Port {listen_port} still busy after initial wait; attempting stale-listener cleanup.",
+            flush=True,
+        )
+        _terminate_stale_listeners(listen_port)
+        if not _wait_until_port_free(listen_port, host=listen_host, timeout_s=20.0):
+            print(
+                f"Port {listen_port} remains busy; launching anyway and letting Gradio surface the error.",
+                flush=True,
+            )
     demo.queue().launch(server_name=listen_host, server_port=listen_port)
