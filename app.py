@@ -23,6 +23,7 @@ import torch
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 PROFILE_CHOICES = ["small", "auth"]
+FAMILY_CHOICES = ["qwen", "lfm2"]
 
 
 def gpu_info():
@@ -33,14 +34,14 @@ def gpu_info():
     return f"{name} — {mem:.1f} GB VRAM"
 
 
-def run_script(script: str, profile: str = "small"):
+def run_script(script: str, profile: str = "small", family: str = "qwen"):
     proc = subprocess.Popen(
         [sys.executable, "-u", script],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
-        env={**os.environ, "PYTHONUNBUFFERED": "1", "MODEL_PROFILE": profile},
+        env={**os.environ, "PYTHONUNBUFFERED": "1", "MODEL_PROFILE": profile, "LLM_FAMILY": family},
     )
     output = ""
     for line in iter(proc.stdout.readline, ""):
@@ -54,36 +55,36 @@ def run_script(script: str, profile: str = "small"):
     yield output
 
 
-def run_baseline(profile: str):
-    yield from run_script("baseline.py", profile)
+def run_baseline(profile: str, family: str):
+    yield from run_script("baseline.py", profile, family)
 
 
-def run_training(profile: str):
-    yield from run_script("train.py", profile)
+def run_training(profile: str, family: str):
+    yield from run_script("train.py", profile, family)
 
 
-def run_eval_sft(profile: str):
-    yield from run_script("eval_sft.py", profile)
+def run_eval_sft(profile: str, family: str):
+    yield from run_script("eval_sft.py", profile, family)
 
 
-def run_eval_rag(profile: str):
-    yield from run_script("eval_sft_rag.py", profile)
+def run_eval_rag(profile: str, family: str):
+    yield from run_script("eval_sft_rag.py", profile, family)
 
 
-def run_eval_tools(profile: str):
-    yield from run_script("eval_tool_calls.py", profile)
+def run_eval_tools(profile: str, family: str):
+    yield from run_script("eval_tool_calls.py", profile, family)
 
 
-def run_autotune(profile: str):
-    yield from run_script("autotune.py", profile)
+def run_autotune(profile: str, family: str):
+    yield from run_script("autotune.py", profile, family)
 
 
-def run_export_merged(profile: str):
-    yield from run_script("export_merged.py", profile)
+def run_export_merged(profile: str, family: str):
+    yield from run_script("export_merged.py", profile, family)
 
 
-def run_export_gguf(profile: str):
-    yield from run_script("export_gguf.py", profile)
+def run_export_gguf(profile: str, family: str):
+    yield from run_script("export_gguf.py", profile, family)
 
 
 def run_merge_next():
@@ -107,14 +108,14 @@ def run_merge_next():
     yield output
 
 
-def run_full_pipeline(profile: str):
+def run_full_pipeline(profile: str, family: str):
     proc = subprocess.Popen(
-        [sys.executable, "-u", "scripts/pipeline.py", "--all", "--profile", profile],
+        [sys.executable, "-u", "scripts/pipeline.py", "--all", "--profile", profile, "--family", family],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
-        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        env={**os.environ, "PYTHONUNBUFFERED": "1", "LLM_FAMILY": family},
     )
     output = ""
     for line in iter(proc.stdout.readline, ""):
@@ -144,7 +145,13 @@ with gr.Blocks(title="sft-wagmi") as demo:
         choices=PROFILE_CHOICES,
         value="small",
         label="Training profile",
-        info="small = Qwen 1.5B (non-auth), auth = Qwen 2.5 14B (authenticated tier)",
+        info="small = anon-tier model, auth = tool-capable authenticated-tier model",
+    )
+    family = gr.Radio(
+        choices=FAMILY_CHOICES,
+        value="qwen",
+        label="Model family",
+        info="qwen = existing Qwen2.5 path, lfm2 = LiquidAI LFM2/LFM2.5 path",
     )
     gr.Markdown(
         "Note: this pipeline is text SFT only. You do not need to upload any image for training."
@@ -157,7 +164,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
         )
         full_btn = gr.Button("Run full pipeline", variant="primary", size="lg")
         full_out = gr.Textbox(label="Output", lines=40, max_lines=200, autoscroll=True)
-        full_btn.click(fn=run_full_pipeline, inputs=profile, outputs=full_out)
+        full_btn.click(fn=run_full_pipeline, inputs=[profile, family], outputs=full_out)
 
     with gr.Tab("0. Merge Next Data"):
         gr.Markdown(
@@ -173,7 +180,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
         gr.Markdown("Run baseline eval for the selected profile model (small or auth).")
         baseline_btn = gr.Button("Run baseline", variant="primary")
         baseline_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
-        baseline_btn.click(fn=run_baseline, inputs=profile, outputs=baseline_out)
+        baseline_btn.click(fn=run_baseline, inputs=[profile, family], outputs=baseline_out)
 
     with gr.Tab("2. Train"):
         gr.Markdown(
@@ -182,19 +189,19 @@ with gr.Blocks(title="sft-wagmi") as demo:
         )
         train_btn = gr.Button("Run training", variant="primary")
         train_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
-        train_btn.click(fn=run_training, inputs=profile, outputs=train_out)
+        train_btn.click(fn=run_training, inputs=[profile, family], outputs=train_out)
 
     with gr.Tab("3. Eval SFT"):
         gr.Markdown("Run fine-tuned model on same prompts and compare with baseline.")
         eval_btn = gr.Button("Run eval", variant="primary")
         eval_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
-        eval_btn.click(fn=run_eval_sft, inputs=profile, outputs=eval_out)
+        eval_btn.click(fn=run_eval_sft, inputs=[profile, family], outputs=eval_out)
 
     with gr.Tab("4. Eval SFT+RAG"):
         gr.Markdown("Run fine-tuned model WITH RAG context injection (simulates production). Compares SFT vs SFT+RAG.")
         eval_rag_btn = gr.Button("Run eval with RAG", variant="primary")
         eval_rag_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
-        eval_rag_btn.click(fn=run_eval_rag, inputs=profile, outputs=eval_rag_out)
+        eval_rag_btn.click(fn=run_eval_rag, inputs=[profile, family], outputs=eval_rag_out)
 
     with gr.Tab("5. Eval Tool Calls"):
         gr.Markdown(
@@ -203,7 +210,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
         )
         eval_tools_btn = gr.Button("Run tool-calling eval", variant="primary")
         eval_tools_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
-        eval_tools_btn.click(fn=run_eval_tools, inputs=profile, outputs=eval_tools_out)
+        eval_tools_btn.click(fn=run_eval_tools, inputs=[profile, family], outputs=eval_tools_out)
 
     with gr.Tab("6. Autotune"):
         gr.Markdown(
@@ -213,7 +220,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
         )
         autotune_btn = gr.Button("Run autotune loop", variant="primary")
         autotune_out = gr.Textbox(label="Output", lines=40, max_lines=120, autoscroll=True)
-        autotune_btn.click(fn=run_autotune, inputs=profile, outputs=autotune_out)
+        autotune_btn.click(fn=run_autotune, inputs=[profile, family], outputs=autotune_out)
 
     with gr.Tab("7. Export Merged"):
         gr.Markdown(
@@ -223,7 +230,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
         )
         export_merged_btn = gr.Button("Export Merged Model", variant="primary")
         export_merged_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
-        export_merged_btn.click(fn=run_export_merged, inputs=profile, outputs=export_merged_out)
+        export_merged_btn.click(fn=run_export_merged, inputs=[profile, family], outputs=export_merged_out)
 
     with gr.Tab("7b. Export GGUF (legacy)"):
         gr.Markdown(
@@ -232,7 +239,7 @@ with gr.Blocks(title="sft-wagmi") as demo:
         )
         export_btn = gr.Button("Export GGUF", variant="secondary")
         export_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
-        export_btn.click(fn=run_export_gguf, inputs=profile, outputs=export_out)
+        export_btn.click(fn=run_export_gguf, inputs=[profile, family], outputs=export_out)
 
 
 if __name__ == "__main__":

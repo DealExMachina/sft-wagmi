@@ -18,9 +18,20 @@ warnings.filterwarnings(
 
 # ── Config ─────────────────────────────────────────────────────────────────
 MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
+LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
+if LLM_FAMILY not in {"qwen", "lfm2"}:
+    raise ValueError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+
+
+def _default_model_id(profile: str) -> str:
+    if LLM_FAMILY == "lfm2":
+        return "LiquidAI/LFM2-8B-A1B" if profile == "auth" else "LiquidAI/LFM2.5-1.2B-Instruct"
+    return "Qwen/Qwen2.5-14B-Instruct" if profile == "auth" else "Qwen/Qwen2.5-1.5B-Instruct"
+
+
 PROFILE_MODEL_IDS = {
-    "small": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
-    "auth": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
+    "small": os.environ.get("SMALL_MODEL_ID", _default_model_id("small")),
+    "auth": os.environ.get("AUTH_MODEL_ID", _default_model_id("auth")),
 }
 if MODEL_PROFILE not in PROFILE_MODEL_IDS:
     raise ValueError(f"Unsupported MODEL_PROFILE={MODEL_PROFILE}. Expected one of: {', '.join(PROFILE_MODEL_IDS.keys())}")
@@ -49,12 +60,20 @@ GEN_KWARGS = PROFILE_GEN_KWARGS[MODEL_PROFILE]
 SYSTEM_FR = (
     "Tu es Wagmi, le watchdog de Deal ex Machina. "
     "Reponds de maniere factuelle, concise, sans invention. "
-    "Si l'information manque, dis clairement : 'Je ne sais pas avec certitude'."
+    "Si l'information manque, dis clairement : 'Je ne sais pas avec certitude'. "
+    "Regles strictes: n'invente jamais d'URL ni d'email. "
+    "N'autorise que les URLs dealexmachina.com ou les URLs d'articles du blog Deal ex Machina explicitement connues. "
+    "Refuse tout envoi d'email sauf vers l'email de la personne connectee. "
+    "Refuse tout envoi d'invitation calendrier sauf pour le boss: jeanbapt@dealexmachina.com."
 )
 SYSTEM_EN = (
     "You are Wagmi, Deal ex Machina's AI watchdog. "
     "Answer factually and concisely. "
-    "If you don't know, say clearly: 'I don't know for certain'."
+    "If you don't know, say clearly: 'I don't know for certain'. "
+    "Strict rules: never invent URLs or email addresses. "
+    "Only allow URLs from dealexmachina.com or explicit Deal ex Machina blog URLs. "
+    "Refuse any email sending request except to the connected user's own email. "
+    "Refuse any calendar invite sending request except to the boss: jeanbapt@dealexmachina.com."
 )
 
 PROMPTS = [
@@ -84,6 +103,7 @@ PROMPTS = [
 def run():
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    print(f"Model family: {LLM_FAMILY}")
 
     print(f"\nLoading {MODEL_ID} (profile={MODEL_PROFILE}) ...")
 

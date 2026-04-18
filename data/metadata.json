@@ -1,31 +1,31 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "generatedAt": "2026-04-05T11:46:51.077Z",
-  "mergedAt": "2026-04-07T08:45:31.571827Z",
+  "mergedAt": "2026-04-17T07:49:56.353653Z",
   "output": {
     "train": "datasets/wagmi-sft/train.jsonl",
     "eval": "datasets/wagmi-sft/eval.jsonl"
   },
   "counts": {
-    "total": 901,
-    "train": 766,
-    "eval": 135
+    "total": 909,
+    "train": 773,
+    "eval": 136
   },
   "distribution": {
     "byLocale": {
-      "fr": 494,
-      "en": 407
+      "fr": 498,
+      "en": 411
     },
     "byTag": {
       "grounded": 648,
       "site-content": 580,
       "citation": 290,
       "summary": 290,
-      "guardrail": 241,
+      "guardrail": 249,
       "hard-negative": 127,
       "cross-lingual": 100,
       "qa": 62,
-      "refusal": 44,
+      "refusal": 46,
       "out-of-scope": 44,
       "uncertainty": 36,
       "identity": 32,
@@ -49,8 +49,14 @@
       "unauth": 6,
       "multi-turn-deception": 6,
       "approach": 4,
+      "email": 4,
       "compliance": 2,
-      "partners": 2
+      "partners": 2,
+      "no-invention": 2,
+      "calendar": 2,
+      "boss-only": 2,
+      "url": 2,
+      "allowlist": 2
     },
     "bySourceType": {
       "synthetic:hard-negative": 127,
@@ -82,6 +88,7 @@
       "obsidian:Wagmi SFT/Seed Notes/technical-stack-data-fr.md": 8,
       "obsidian:Wagmi SFT/00-Overview.md": 8,
       "synthetic:multi-turn": 8,
+      "handcrafted": 8,
       "obsidian:Wagmi SFT/Seed Notes/technical-stack-frontend-fr.md": 6,
       "obsidian:Wagmi SFT/Seed Notes/technical-stack-overview-fr.md": 6,
       "obsidian:Wagmi SFT/Seed Notes/technical-stack-quality-cicd-fr.md": 6,

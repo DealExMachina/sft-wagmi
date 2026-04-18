@@ -35,20 +35,61 @@ warnings.filterwarnings(
 
 # ── Config ────────────────────────────────────────────────────────────────────
 MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
+LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
+if LLM_FAMILY not in {"qwen", "lfm2"}:
+    raise RuntimeError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+
+
+def _defaults(profile: str) -> dict[str, str]:
+    if LLM_FAMILY == "lfm2":
+        if profile == "small":
+            return {
+                "base_model_id": "LiquidAI/LFM2.5-1.2B-Instruct",
+                "hub_adapter": "jeanbaptdzd/wagmi-lfm2-small-sft",
+                "adapter_dir": "output/wagmi-lfm2-small-sft",
+                "max_seq_len": "2048",
+                "load_in_4bit": "false",
+            }
+        return {
+            "base_model_id": "LiquidAI/LFM2-8B-A1B",
+            "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
+            "adapter_dir": "output/wagmi-lfm2-auth-sft",
+            "max_seq_len": "2048",
+            "load_in_4bit": "true",
+        }
+    if profile == "small":
+        return {
+            "base_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+            "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft",
+            "adapter_dir": "output/wagmi-qwen2.5-1.5b-sft",
+            "max_seq_len": "2048",
+            "load_in_4bit": "false",
+        }
+    return {
+        "base_model_id": "Qwen/Qwen2.5-14B-Instruct",
+        "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-14b-sft",
+        "adapter_dir": "output/wagmi-qwen2.5-14b-sft",
+        "max_seq_len": "2048",
+        "load_in_4bit": "true",
+    }
+
+
+SMALL_DEFAULTS = _defaults("small")
+AUTH_DEFAULTS = _defaults("auth")
 PROFILE_CONFIG = {
     "small": {
-        "base_model_id": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
-        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"),
-        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", "output/wagmi-qwen2.5-1.5b-sft"),
-        "max_seq_len": int(os.environ.get("SMALL_MAX_SEQ_LEN", "2048")),
-        "load_in_4bit": os.environ.get("SMALL_LOAD_IN_4BIT", "false").lower() == "true",
+        "base_model_id": os.environ.get("SMALL_MODEL_ID", SMALL_DEFAULTS["base_model_id"]),
+        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", SMALL_DEFAULTS["hub_adapter"]),
+        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", SMALL_DEFAULTS["adapter_dir"]),
+        "max_seq_len": int(os.environ.get("SMALL_MAX_SEQ_LEN", SMALL_DEFAULTS["max_seq_len"])),
+        "load_in_4bit": os.environ.get("SMALL_LOAD_IN_4BIT", SMALL_DEFAULTS["load_in_4bit"]).lower() == "true",
     },
     "auth": {
-        "base_model_id": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
-        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-14b-sft"),
-        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-qwen2.5-14b-sft"),
-        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", "2048")),
-        "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", "true").lower() != "false",
+        "base_model_id": os.environ.get("AUTH_MODEL_ID", AUTH_DEFAULTS["base_model_id"]),
+        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", AUTH_DEFAULTS["hub_adapter"]),
+        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", AUTH_DEFAULTS["adapter_dir"]),
+        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", AUTH_DEFAULTS["max_seq_len"])),
+        "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", AUTH_DEFAULTS["load_in_4bit"]).lower() != "false",
     },
 }
 if MODEL_PROFILE not in PROFILE_CONFIG:
@@ -286,12 +327,20 @@ def build_system_prompt(locale: str, category: str) -> str:
     base_fr = (
         "Tu es Wagmi, le watchdog de Deal ex Machina. "
         "Reponds de maniere factuelle, concise, sans invention. "
-        "Si l'information manque, dis clairement : 'Je ne sais pas avec certitude'."
+        "Si l'information manque, dis clairement : 'Je ne sais pas avec certitude'. "
+        "Regles strictes: n'invente jamais d'URL ni d'email. "
+        "N'autorise que les URLs dealexmachina.com ou les URLs d'articles du blog Deal ex Machina explicitement connues. "
+        "Refuse tout envoi d'email sauf vers l'email de la personne connectee. "
+        "Refuse tout envoi d'invitation calendrier sauf pour le boss: jeanbapt@dealexmachina.com."
     )
     base_en = (
         "You are Wagmi, Deal ex Machina's AI watchdog. "
         "Answer factually and concisely. "
-        "If you don't know, say clearly: 'I don't know for certain'."
+        "If you don't know, say clearly: 'I don't know for certain'. "
+        "Strict rules: never invent URLs or email addresses. "
+        "Only allow URLs from dealexmachina.com or explicit Deal ex Machina blog URLs. "
+        "Refuse any email sending request except to the connected user's own email. "
+        "Refuse any calendar invite sending request except to the boss: jeanbapt@dealexmachina.com."
     )
 
     quality_fr = (
@@ -419,10 +468,18 @@ def correct_response(client, scored: dict) -> dict | None:
 
     system = (
         "Tu es Wagmi, le watchdog de Deal ex Machina. Reponds de maniere factuelle, concise, sans invention. "
-        "Si l'information manque, dis clairement: 'Je ne sais pas avec certitude'."
+        "Si l'information manque, dis clairement: 'Je ne sais pas avec certitude'. "
+        "Regles strictes: n'invente jamais d'URL ni d'email. "
+        "N'autorise que les URLs dealexmachina.com ou les URLs d'articles du blog Deal ex Machina explicitement connues. "
+        "Refuse tout envoi d'email sauf vers l'email de la personne connectee. "
+        "Refuse tout envoi d'invitation calendrier sauf pour le boss: jeanbapt@dealexmachina.com."
     ) if locale == "fr" else (
         "You are Wagmi, the Deal ex Machina watchdog. Reply factually and concisely with no invention. "
-        "If information is missing, say clearly: 'I am not sure with certainty'."
+        "If information is missing, say clearly: 'I am not sure with certainty'. "
+        "Strict rules: never invent URLs or email addresses. "
+        "Only allow URLs from dealexmachina.com or explicit Deal ex Machina blog URLs. "
+        "Refuse any email sending request except to the connected user's own email. "
+        "Refuse any calendar invite sending request except to the boss: jeanbapt@dealexmachina.com."
     )
 
     return {
@@ -518,6 +575,7 @@ def run():
     client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
     print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"Family: {LLM_FAMILY}")
     print(f"Profile: {MODEL_PROFILE}")
     print(f"Judge: {JUDGE_MODEL}")
     print(f"Prompts: {len(PROMPTS)}")

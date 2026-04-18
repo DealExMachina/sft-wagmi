@@ -1,7 +1,9 @@
 """Export fine-tuned Wagmi to GGUF for Ollama deployment.
 
 Merges the LoRA adapter into the base model and exports a quantised GGUF file.
-Pushes to HuggingFace Hub and generates an Ollama Modelfile with ChatML template.
+Pushes to HuggingFace Hub and generates an Ollama Modelfile using the same
+tool-capable Go template as library ``qwen2.5:*-instruct`` (see
+``scripts/ollama_qwen25_instruct_template.gotmpl``).
 """
 
 import os
@@ -16,20 +18,62 @@ from huggingface_hub import HfApi, create_repo
 from unsloth import FastLanguageModel
 
 MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
+LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
+if LLM_FAMILY not in {"qwen", "lfm2"}:
+    raise ValueError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+
+
+def _profile_defaults(profile: str) -> dict[str, str]:
+    if LLM_FAMILY == "lfm2":
+        if profile == "small":
+            return {
+                "base_model_id": "LiquidAI/LFM2.5-1.2B-Instruct",
+                "hub_adapter": "jeanbaptdzd/wagmi-lfm2-small-sft",
+                "adapter_dir": "output/wagmi-lfm2-small-sft",
+                "hub_gguf_repo": "jeanbaptdzd/wagmi-lfm2-small-sft-gguf",
+                "artifact_prefix": "wagmi-lfm2-small-sft",
+            }
+        return {
+            "base_model_id": "LiquidAI/LFM2-8B-A1B",
+            "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
+            "adapter_dir": "output/wagmi-lfm2-auth-sft",
+            "hub_gguf_repo": "jeanbaptdzd/wagmi-lfm2-auth-sft-gguf",
+            "artifact_prefix": "wagmi-lfm2-auth-sft",
+        }
+    if profile == "small":
+        return {
+            "base_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+            "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft",
+            "adapter_dir": "output/wagmi-qwen2.5-1.5b-sft",
+            "hub_gguf_repo": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft-gguf",
+            "artifact_prefix": "wagmi-qwen2.5-1.5b-sft",
+        }
+    return {
+        "base_model_id": "Qwen/Qwen2.5-14B-Instruct",
+        "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-14b-sft",
+        "adapter_dir": "output/wagmi-qwen2.5-14b-sft",
+        "hub_gguf_repo": "jeanbaptdzd/wagmi-qwen2.5-14b-sft-gguf",
+        "artifact_prefix": "wagmi-qwen2.5-14b-sft",
+    }
+
+
+SMALL_DEFAULTS = _profile_defaults("small")
+AUTH_DEFAULTS = _profile_defaults("auth")
+
 PROFILE_CONFIG = {
     "small": {
-        "base_model_id": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
-        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"),
-        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", "output/wagmi-qwen2.5-1.5b-sft"),
-        "hub_gguf_repo": os.environ.get("SMALL_HUB_GGUF_REPO", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft-gguf"),
-        "artifact_prefix": "wagmi-qwen2.5-1.5b-sft",
+        "base_model_id": os.environ.get("SMALL_MODEL_ID", SMALL_DEFAULTS["base_model_id"]),
+        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", SMALL_DEFAULTS["hub_adapter"]),
+        "adapter_dir": os.environ.get("SMALL_OUTPUT_DIR", SMALL_DEFAULTS["adapter_dir"]),
+        "hub_gguf_repo": os.environ.get("SMALL_HUB_GGUF_REPO", SMALL_DEFAULTS["hub_gguf_repo"]),
+        "artifact_prefix": os.environ.get("SMALL_ARTIFACT_PREFIX", SMALL_DEFAULTS["artifact_prefix"]),
     },
     "auth": {
-        "base_model_id": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
-        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-14b-sft"),
-        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-qwen2.5-14b-sft"),
-        "hub_gguf_repo": os.environ.get("AUTH_HUB_GGUF_REPO", "jeanbaptdzd/wagmi-qwen2.5-14b-sft-gguf"),
-        "artifact_prefix": "wagmi-qwen2.5-14b-sft",
+        "base_model_id": os.environ.get("AUTH_MODEL_ID", AUTH_DEFAULTS["base_model_id"]),
+        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", AUTH_DEFAULTS["hub_adapter"]),
+        "adapter_dir": os.environ.get("AUTH_OUTPUT_DIR", AUTH_DEFAULTS["adapter_dir"]),
+        "hub_gguf_repo": os.environ.get("AUTH_HUB_GGUF_REPO", AUTH_DEFAULTS["hub_gguf_repo"]),
+        "artifact_prefix": os.environ.get("AUTH_ARTIFACT_PREFIX", AUTH_DEFAULTS["artifact_prefix"]),
     },
 }
 if MODEL_PROFILE not in PROFILE_CONFIG:
@@ -39,6 +83,19 @@ cfg = PROFILE_CONFIG[MODEL_PROFILE]
 BASE_MODEL_ID = cfg["base_model_id"]
 HUB_ADAPTER = cfg["hub_adapter"]
 ADAPTER_DIR = cfg["adapter_dir"]
+# Align with dexm-one-page local Ollama defaults: wagmi-sft:latest vs wagmi-sft-14b:latest
+OLLAMA_MODEL_NAME = os.environ.get(
+    "OLLAMA_MODEL_NAME",
+    (
+        "wagmi-lfm2-auth"
+        if LLM_FAMILY == "lfm2" and MODEL_PROFILE == "auth"
+        else "wagmi-lfm2-small"
+        if LLM_FAMILY == "lfm2"
+        else "wagmi-sft-14b"
+        if MODEL_PROFILE == "auth"
+        else "wagmi-sft"
+    ),
+)
 MAX_SEQ_LEN = 2048
 DTYPE = torch.bfloat16
 
@@ -52,55 +109,36 @@ LLAMA_CPP_PATH = Path(os.environ.get("UNSLOTH_LLAMA_CPP_PATH", "/opt/llama.cpp")
 SYSTEM_PROMPT = (
     "Tu es Wagmi, le watchdog de Deal ex Machina. "
     "Reponds de maniere factuelle, concise, sans invention. "
-    "Si l'information manque, dis clairement: 'Je ne sais pas avec certitude'."
+    "Si l'information manque, dis clairement: 'Je ne sais pas avec certitude'. "
+    "Regles strictes: n'invente jamais d'URL ni d'email. "
+    "N'autorise que les URLs dealexmachina.com ou les URLs d'articles du blog Deal ex Machina explicitement connues. "
+    "Refuse tout envoi d'email sauf vers l'email de la personne connectee. "
+    "Refuse tout envoi d'invitation calendrier sauf pour le boss: jeanbapt@dealexmachina.com."
 )
 
-MODELFILE_TEMPLATES = {
-    "small": '''FROM {gguf_filename}
+_REPO_ROOT = Path(__file__).resolve().parent
+OLLAMA_QWEN25_INSTRUCT_TEMPLATE = _REPO_ROOT / "scripts" / "ollama_qwen25_instruct_template.gotmpl"
 
-TEMPLATE """{{{{- if .System }}}}<|im_start|>system
-{{{{ .System }}}}<|im_end|>
-{{{{ end }}}}<|im_start|>user
-{{{{ .Prompt }}}}<|im_end|>
-<|im_start|>assistant
-{{{{ .Response }}}}<|im_end|>
-"""
 
-PARAMETER num_ctx 2048
-PARAMETER num_predict 220
-PARAMETER temperature 0.2
-PARAMETER top_k 30
-PARAMETER top_p 0.9
-PARAMETER repeat_penalty 1.12
-PARAMETER repeat_last_n 128
-PARAMETER stop "<|im_end|>"
-PARAMETER stop "<|im_start|>"
-
-SYSTEM """{system_prompt}"""
-''',
-    "auth": '''FROM {gguf_filename}
-
-TEMPLATE """{{{{- if .System }}}}<|im_start|>system
-{{{{ .System }}}}<|im_end|>
-{{{{ end }}}}<|im_start|>user
-{{{{ .Prompt }}}}<|im_end|>
-<|im_start|>assistant
-{{{{ .Response }}}}<|im_end|>
-"""
-
-PARAMETER num_ctx 2048
-PARAMETER num_predict 220
-PARAMETER temperature 0.2
-PARAMETER top_k 30
-PARAMETER top_p 0.9
-PARAMETER repeat_penalty 1.12
-PARAMETER repeat_last_n 128
-PARAMETER stop "<|im_end|>"
-PARAMETER stop "<|im_start|>"
-
-SYSTEM """{system_prompt}"""
-''',
-}
+def build_modelfile_wagmi(gguf_filename: str, system_prompt: str) -> str:
+    """Ollama Modelfile: Qwen2.5 instruct template with .Tools / tool_call (small + auth)."""
+    go_template = OLLAMA_QWEN25_INSTRUCT_TEMPLATE.read_text(encoding="utf-8")
+    im_end = "<|" + "im" + "_" + "end" + "|>"
+    return (
+        f"FROM {gguf_filename}\n\n"
+        f'TEMPLATE """\n{go_template}"""\n\n'
+        "PARAMETER num_ctx 2048\n"
+        "PARAMETER num_predict 220\n"
+        "PARAMETER temperature 0.2\n"
+        "PARAMETER top_k 30\n"
+        "PARAMETER top_p 0.9\n"
+        "PARAMETER repeat_penalty 1.12\n"
+        "PARAMETER repeat_last_n 128\n"
+        f'PARAMETER stop "{im_end}"\n'
+        'PARAMETER stop "<|im_start|>"\n'
+        "\n"
+        f'SYSTEM """{system_prompt}"""\n'
+    )
 
 
 def assert_llama_cpp_ready() -> None:
@@ -123,6 +161,7 @@ def assert_llama_cpp_ready() -> None:
 
 def run():
     print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"Model family: {LLM_FAMILY}")
     print(f"llama.cpp path: {LLAMA_CPP_PATH}")
     assert_llama_cpp_ready()
 
@@ -177,9 +216,7 @@ def run():
     print(f"  Final: {target_name} ({target_path.stat().st_size / 1e6:.0f} MB)")
 
     # ── Generate Modelfile ────────────────────────────────────────────────
-    modelfile_content = MODELFILE_TEMPLATES[MODEL_PROFILE].format(
-        gguf_filename=target_name, system_prompt=SYSTEM_PROMPT,
-    )
+    modelfile_content = build_modelfile_wagmi(target_name, SYSTEM_PROMPT)
     modelfile_path = GGUF_DIR / "Modelfile.wagmi-sft"
     modelfile_path.write_text(modelfile_content)
     print(f"\nModelfile written to {modelfile_path}")
@@ -247,11 +284,11 @@ def run():
   # Edit Modelfile: change FROM line to point to local path
   # FROM ~/wagmi-sft.gguf
 
-  # Create Ollama model
-  ollama create wagmi-sft -f ~/Modelfile.wagmi-sft
+  # Create Ollama model (override with OLLAMA_MODEL_NAME=... if your tags differ)
+  ollama create {OLLAMA_MODEL_NAME} -f ~/Modelfile.wagmi-sft
 
   # Test
-  ollama run wagmi-sft "C'est quoi Deal ex Machina ?"
+  ollama run {OLLAMA_MODEL_NAME} "C'est quoi Deal ex Machina ?"
 
 {'='*60}
 """)

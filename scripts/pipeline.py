@@ -7,8 +7,9 @@ Workflow:
   4) train.py
   5) autotune.py (requires OPENAI_API_KEY)
   6) eval_sft.py / eval_sft_rag.py / eval_tool_calls.py
-  7) export_merged.py (push merged model to Hub)
-  8) local GGUF conversion (scripts/local_gguf_export.sh — manual)
+  7) eval_redteam.py (versioned guardrail red-team report)
+  8) export_merged.py (push merged model to Hub)
+  9) local GGUF conversion (scripts/local_gguf_export.sh — manual)
 
 Usage:
   python3 scripts/pipeline.py --all --profile auth
@@ -41,6 +42,7 @@ SCRIPT_STEPS = {
     "eval": ROOT / "eval_sft.py",
     "eval-rag": ROOT / "eval_sft_rag.py",
     "eval-tools": ROOT / "eval_tool_calls.py",
+    "redteam": ROOT / "eval_redteam.py",
     "export-merged": ROOT / "export_merged.py",
     "export-gguf": ROOT / "export_gguf.py",
 }
@@ -130,7 +132,7 @@ def run_notebook(notebook_key: str, dry_run: bool, profile: str) -> int:
         ],
         cwd=ROOT,
         dry_run=dry_run,
-        extra_env={"MODEL_PROFILE": profile},
+        extra_env={"MODEL_PROFILE": profile, "LLM_FAMILY": os.environ.get("LLM_FAMILY", "qwen")},
     )
 
 
@@ -140,7 +142,7 @@ def run_python_step(step_key: str, dry_run: bool, profile: str) -> int:
         ["python3", str(script)],
         cwd=ROOT,
         dry_run=dry_run,
-        extra_env={"MODEL_PROFILE": profile},
+        extra_env={"MODEL_PROFILE": profile, "LLM_FAMILY": os.environ.get("LLM_FAMILY", "qwen")},
     )
 
 
@@ -232,7 +234,9 @@ def parse_args() -> argparse.Namespace:
         epilog="""
 examples:
   %(prog)s --all --profile auth          # full pipeline (L40)
+  %(prog)s --all --profile auth --family lfm2
   %(prog)s --merge-next --train          # merge new data + retrain
+  %(prog)s --profile auth --redteam      # generate AI Act red-team report
   %(prog)s --preflight --dry-run         # check environment
   %(prog)s --train --export-merged       # train + push merged model
 """,
@@ -240,6 +244,9 @@ examples:
     parser.add_argument("--profile", choices=["small", "auth"],
                         default=os.environ.get("MODEL_PROFILE", "small"),
                         help="Model profile (default: small)")
+    parser.add_argument("--family", choices=["qwen", "lfm2"],
+                        default=os.environ.get("LLM_FAMILY", "qwen"),
+                        help="Base model family defaults (default: qwen)")
     parser.add_argument("--preflight", action="store_true", help="Run environment checks")
     parser.add_argument("--sync-dataset", action="store_true", help="Sync dataset from ../dexm-one-page")
     parser.add_argument("--merge-next", action="store_true", help="Merge data/next/ into training set")
@@ -251,10 +258,11 @@ examples:
     parser.add_argument("--eval", action="store_true", help="Run eval_sft.py")
     parser.add_argument("--eval-rag", action="store_true", help="Run eval_sft_rag.py")
     parser.add_argument("--eval-tools", action="store_true", help="Run eval_tool_calls.py")
+    parser.add_argument("--redteam", action="store_true", help="Run eval_redteam.py and generate versioned report")
     parser.add_argument("--export-merged", action="store_true", help="Export merged model to Hub")
     parser.add_argument("--export-gguf", action="store_true", help="Export GGUF (legacy, on-Space)")
     parser.add_argument("--all", action="store_true",
-                        help="Full pipeline: preflight -> merge-next -> train -> eval -> export-merged")
+                        help="Full pipeline: preflight -> merge-next -> train -> eval -> eval-rag -> redteam -> export-merged")
     parser.add_argument("--dry-run", action="store_true", help="Print commands without executing")
     return parser.parse_args()
 
@@ -262,7 +270,9 @@ examples:
 def main() -> int:
     args = parse_args()
     profile = args.profile
+    family = args.family
     os.environ["MODEL_PROFILE"] = profile
+    os.environ["LLM_FAMILY"] = family
     load_env_file(ENV_FILE)
 
     run_all = args.all
@@ -275,17 +285,18 @@ def main() -> int:
     do_eval = args.eval or run_all
     do_eval_rag = args.eval_rag or run_all
     do_eval_tools = args.eval_tools
+    do_redteam = args.redteam or run_all
     do_export_merged = args.export_merged or run_all
     do_export_gguf = args.export_gguf
 
     steps = [do_preflight, do_sync, do_merge, do_baseline, do_train,
-             do_autotune, do_eval, do_eval_rag, do_eval_tools,
+             do_autotune, do_eval, do_eval_rag, do_eval_tools, do_redteam,
              do_export_merged, do_export_gguf]
     if not any(steps):
         print("No step selected. Use --all or explicit step flags. See --help.")
         return 1
 
-    print(f"\nsft-wagmi pipeline v{get_version()} | profile={profile}")
+    print(f"\nsft-wagmi pipeline v{get_version()} | family={family} | profile={profile}")
 
     if do_preflight:
         if not preflight(profile):
@@ -333,6 +344,11 @@ def main() -> int:
     if do_eval_tools:
         print_header(f"Eval Tool Calls ({profile})")
         if run_pipeline_step("eval-tools", args.dry_run, profile) != 0:
+            return 1
+
+    if do_redteam:
+        print_header(f"Red Team Guardrails ({profile})")
+        if run_pipeline_step("redteam", args.dry_run, profile) != 0:
             return 1
 
     if do_export_merged:
