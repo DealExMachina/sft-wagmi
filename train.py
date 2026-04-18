@@ -24,8 +24,6 @@ if _MODEL_PROFILE_EARLY == "auth":
         os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
         os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
 
-from unsloth import FastLanguageModel
-
 import torch
 from datasets import concatenate_datasets, load_dataset
 from transformers import TrainingArguments
@@ -75,6 +73,17 @@ AUTH_TOOLING_MULTIPLIER = int(os.environ.get("AUTH_TOOLING_MULTIPLIER", "3"))
 
 
 def run():
+    if not torch.cuda.is_available():
+        print(
+            "Training requires a CUDA GPU for Unsloth. "
+            "Current runtime has no GPU (likely HF cpu-basic). "
+            "Switch Space hardware to a GPU tier, then rerun.",
+            flush=True,
+        )
+        raise SystemExit(2)
+
+    from unsloth import FastLanguageModel
+
     print_device_info()
     if MODEL_PROFILE == "auth":
         print(

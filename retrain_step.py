@@ -58,6 +58,16 @@ def main() -> None:
     import torch
     from datasets import load_dataset
     from transformers import TrainingArguments
+
+    if not torch.cuda.is_available():
+        print(
+            "Retrain requires a CUDA GPU for Unsloth. "
+            "Current runtime has no GPU (likely HF cpu-basic). "
+            "Switch Space hardware to a GPU tier, then rerun.",
+            flush=True,
+        )
+        raise SystemExit(2)
+
     from unsloth import FastLanguageModel
 
     from config import print_device_info, resolve_family, resolve_profile, resolve_profile_config
