@@ -5,6 +5,10 @@ Single script that runs locally on Mac/Linux. No GPU needed (1.5B model fits in 
     pip install torch transformers peft huggingface_hub
     HF_TOKEN=hf_xxx python3.11 scripts/export_ollama.py
 
+Default OLLAMA_MODEL_NAME is ``wagmi-sft`` (``ollama list`` shows ``wagmi-sft:latest``). For a 14B
+GGUF workflow, set e.g. ``OLLAMA_MODEL_NAME=wagmi-sft-14b`` so it matches dexm-one-page dev defaults.
+Custom tags like ``wagmi-sft:1.5b`` are fine if they match your local ``ollama list``.
+
 Requires:
   - Ollama >= 0.5  (https://ollama.com)
   - llama.cpp      (brew install llama.cpp)
@@ -17,11 +21,21 @@ import sys
 import tempfile
 from pathlib import Path
 
-ADAPTER_HUB_ID = os.environ.get(
-    "ADAPTER_HUB_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"
-)
-BASE_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
-OLLAMA_MODEL_NAME = os.environ.get("OLLAMA_MODEL_NAME", "wagmi-sft")
+LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
+if LLM_FAMILY not in {"qwen", "lfm2"}:
+    raise ValueError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+
+DEFAULT_ADAPTER_HUB_ID = "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"
+DEFAULT_BASE_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
+DEFAULT_OLLAMA_MODEL_NAME = "wagmi-sft"
+if LLM_FAMILY == "lfm2":
+    DEFAULT_ADAPTER_HUB_ID = "jeanbaptdzd/wagmi-lfm2-small-sft"
+    DEFAULT_BASE_MODEL_ID = "LiquidAI/LFM2.5-1.2B-Instruct"
+    DEFAULT_OLLAMA_MODEL_NAME = "wagmi-lfm2-small"
+
+ADAPTER_HUB_ID = os.environ.get("ADAPTER_HUB_ID", DEFAULT_ADAPTER_HUB_ID)
+BASE_MODEL_ID = os.environ.get("BASE_MODEL_ID", DEFAULT_BASE_MODEL_ID)
+OLLAMA_MODEL_NAME = os.environ.get("OLLAMA_MODEL_NAME", DEFAULT_OLLAMA_MODEL_NAME)
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 QUANTIZATION = os.environ.get("QUANTIZATION", "Q4_K_M")
 CACHE_DIR = Path(".cache/wagmi-merge")
@@ -31,35 +45,36 @@ QUANTIZE_BIN = "llama-quantize"
 
 SYSTEM_PROMPT = (
     "Tu es Wagmi, le watchdog de Deal ex Machina. "
-    "Réponds de manière factuelle, concise, sans invention. "
-    "Si l'information manque, dis clairement: 'Je ne sais pas avec certitude'."
+    "Reponds de maniere factuelle, concise, sans invention. "
+    "Si l'information manque, dis clairement: 'Je ne sais pas avec certitude'. "
+    "Regles strictes: n'invente jamais d'URL ni d'email. "
+    "N'autorise que les URLs dealexmachina.com ou les URLs d'articles du blog Deal ex Machina explicitement connues. "
+    "Refuse tout envoi d'email sauf vers l'email de la personne connectee. "
+    "Refuse tout envoi d'invitation calendrier sauf pour le boss: jeanbapt@dealexmachina.com."
 )
 
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_OLLAMA_QWEN25_TEMPLATE = _SCRIPT_DIR / "ollama_qwen25_instruct_template.gotmpl"
+
 def build_modelfile(gguf_path: str) -> str:
-    lines = [
-        f"FROM {gguf_path}",
-        "",
-        'TEMPLATE """{{- if .System }}<|im_start|>system',
-        "{{ .System }}<|im_end|>",
-        "{{ end }}<|im_start|>user",
-        "{{ .Prompt }}<|im_end|>",
-        "<|im_start|>assistant",
-        '{{ .Response }}<|im_end|>',
-        '"""',
-        "",
-        "PARAMETER num_ctx 2048",
-        "PARAMETER num_predict 220",
-        "PARAMETER temperature 0.2",
-        "PARAMETER top_k 30",
-        "PARAMETER top_p 0.9",
-        "PARAMETER repeat_penalty 1.12",
-        "PARAMETER repeat_last_n 128",
-        'PARAMETER stop "<|im_end|>"',
-        'PARAMETER stop "<|im_start|>"',
-        "",
-        f'SYSTEM """{SYSTEM_PROMPT}"""',
-    ]
-    return "\n".join(lines) + "\n"
+    """Same tool-capable Go template as Ollama library qwen2.5:*-instruct."""
+    go_template = _OLLAMA_QWEN25_TEMPLATE.read_text(encoding="utf-8")
+    im_end = "<|" + "im" + "_" + "end" + "|>"
+    return (
+        f"FROM {gguf_path}\n\n"
+        f'TEMPLATE """\n{go_template}"""\n\n'
+        "PARAMETER num_ctx 2048\n"
+        "PARAMETER num_predict 220\n"
+        "PARAMETER temperature 0.2\n"
+        "PARAMETER top_k 30\n"
+        "PARAMETER top_p 0.9\n"
+        "PARAMETER repeat_penalty 1.12\n"
+        "PARAMETER repeat_last_n 128\n"
+        f'PARAMETER stop "{im_end}"\n'
+        'PARAMETER stop "<|im_start|>"\n'
+        "\n"
+        f'SYSTEM """{SYSTEM_PROMPT}"""\n'
+    )
 
 SMOKE_PROMPT = "C'est quoi Deal ex Machina ?"
 
@@ -200,7 +215,7 @@ def smoke_test():
     else:
         err = result.stderr.strip() or result.stdout.strip() or "(no output)"
         print(f"Smoke test issue: {err}", file=sys.stderr)
-        print("Try manually: ollama run wagmi-sft")
+        print(f"Try manually: ollama run {OLLAMA_MODEL_NAME}")
 
 
 def cleanup():

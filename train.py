@@ -37,9 +37,47 @@ warnings.filterwarnings(
     category=FutureWarning,
 )
 
+LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
+if LLM_FAMILY not in {"qwen", "lfm2"}:
+    raise ValueError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+
+
+def _default_profile_config(profile: str) -> dict[str, str]:
+    if LLM_FAMILY == "lfm2":
+        if profile == "small":
+            return {
+                "model_id": "LiquidAI/LFM2.5-1.2B-Instruct",
+                "output_dir": "output/wagmi-lfm2-small-sft",
+                "hub_model_id": "jeanbaptdzd/wagmi-lfm2-small-sft",
+                "run_name": "wagmi-lfm2-small",
+            }
+        return {
+            "model_id": "LiquidAI/LFM2-8B-A1B",
+            "output_dir": "output/wagmi-lfm2-auth-sft",
+            "hub_model_id": "jeanbaptdzd/wagmi-lfm2-auth-sft",
+            "run_name": "wagmi-lfm2-auth",
+        }
+    if profile == "small":
+        return {
+            "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+            "output_dir": "output/wagmi-qwen2.5-1.5b-sft",
+            "hub_model_id": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft",
+            "run_name": "wagmi-qwen2.5-1.5b",
+        }
+    return {
+        "model_id": "Qwen/Qwen2.5-14B-Instruct",
+        "output_dir": "output/wagmi-qwen2.5-14b-sft",
+        "hub_model_id": "jeanbaptdzd/wagmi-qwen2.5-14b-sft",
+        "run_name": "wagmi-qwen2.5-14b",
+    }
+
+
+SMALL_DEFAULTS = _default_profile_config("small")
+AUTH_DEFAULTS = _default_profile_config("auth")
+
 PROFILES = {
     "small": {
-        "model_id": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
+        "model_id": os.environ.get("SMALL_MODEL_ID", SMALL_DEFAULTS["model_id"]),
         "max_seq_len": int(os.environ.get("SMALL_MAX_SEQ_LEN", "2048")),
         "load_in_4bit": os.environ.get("SMALL_LOAD_IN_4BIT", "false").lower() == "true",
         "lora_r": int(os.environ.get("SMALL_LORA_R", "32")),
@@ -49,12 +87,12 @@ PROFILES = {
         "per_device_batch": int(os.environ.get("SMALL_PER_DEVICE_BATCH", "4")),
         "grad_accum": int(os.environ.get("SMALL_GRAD_ACCUM", "2")),
         "dataset_num_proc": int(os.environ.get("SMALL_DATASET_NUM_PROC", "2")),
-        "output_dir": os.environ.get("SMALL_OUTPUT_DIR", "output/wagmi-qwen2.5-1.5b-sft"),
-        "hub_model_id": os.environ.get("SMALL_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"),
-        "run_name": os.environ.get("SMALL_RUN_NAME", "wagmi-qwen2.5-1.5b"),
+        "output_dir": os.environ.get("SMALL_OUTPUT_DIR", SMALL_DEFAULTS["output_dir"]),
+        "hub_model_id": os.environ.get("SMALL_HUB_MODEL_ID", SMALL_DEFAULTS["hub_model_id"]),
+        "run_name": os.environ.get("SMALL_RUN_NAME", SMALL_DEFAULTS["run_name"]),
     },
     "auth": {
-        "model_id": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
+        "model_id": os.environ.get("AUTH_MODEL_ID", AUTH_DEFAULTS["model_id"]),
         "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", "2048")),
         "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", "true").lower() != "false",
         "lora_r": int(os.environ.get("AUTH_LORA_R", "32")),
@@ -64,9 +102,9 @@ PROFILES = {
         "per_device_batch": int(os.environ.get("AUTH_PER_DEVICE_BATCH", "1")),
         "grad_accum": int(os.environ.get("AUTH_GRAD_ACCUM", "8")),
         "dataset_num_proc": int(os.environ.get("AUTH_DATASET_NUM_PROC", "1")),
-        "output_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-qwen2.5-14b-sft"),
-        "hub_model_id": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-14b-sft"),
-        "run_name": os.environ.get("AUTH_RUN_NAME", "wagmi-qwen2.5-14b"),
+        "output_dir": os.environ.get("AUTH_OUTPUT_DIR", AUTH_DEFAULTS["output_dir"]),
+        "hub_model_id": os.environ.get("AUTH_HUB_MODEL_ID", AUTH_DEFAULTS["hub_model_id"]),
+        "run_name": os.environ.get("AUTH_RUN_NAME", AUTH_DEFAULTS["run_name"]),
     },
 }
 
@@ -118,6 +156,7 @@ def run():
         )
     print(json.dumps({
         "version": MODEL_VERSION,
+        "family": LLM_FAMILY,
         "profile": MODEL_PROFILE,
         "model": MODEL_ID, "lora_r": LORA_R, "lora_alpha": LORA_ALPHA,
         "lr": LEARNING_RATE, "epochs": NUM_EPOCHS,

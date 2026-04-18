@@ -26,11 +26,13 @@ case "$PROFILE" in
     HUB_MERGED="jeanbaptdzd/wagmi-qwen2.5-1.5b-sft-merged"
     HUB_GGUF="jeanbaptdzd/wagmi-qwen2.5-1.5b-sft-gguf"
     ARTIFACT="wagmi-qwen2.5-1.5b-sft"
+    DEFAULT_OLLAMA="wagmi-sft"
     ;;
   auth)
     HUB_MERGED="jeanbaptdzd/wagmi-qwen2.5-14b-sft-merged"
     HUB_GGUF="jeanbaptdzd/wagmi-qwen2.5-14b-sft-gguf"
     ARTIFACT="wagmi-qwen2.5-14b-sft"
+    DEFAULT_OLLAMA="wagmi-sft-14b"
     ;;
   *)
     echo "Usage: $0 [small|auth]" >&2
@@ -38,9 +40,12 @@ case "$PROFILE" in
     ;;
 esac
 
+# Matches dexm-one-page local defaults (ollama list: wagmi-sft:latest, wagmi-sft-14b:latest).
+OLLAMA_MODEL="${OLLAMA_MODEL:-$DEFAULT_OLLAMA}"
+
 QUANT="Q4_K_M"
 WORK_DIR="output/${PROFILE}-gguf-local"
-SYSTEM_PROMPT="Tu es Wagmi, le watchdog de Deal ex Machina. Reponds de maniere factuelle, concise, sans invention. Si l'information manque, dis clairement: 'Je ne sais pas avec certitude'."
+SYSTEM_PROMPT="Tu es Wagmi, le watchdog de Deal ex Machina. Reponds de maniere factuelle, concise, sans invention. Si l'information manque, dis clairement: 'Je ne sais pas avec certitude'. Regles strictes: n'invente jamais d'URL ni d'email. N'autorise que les URLs dealexmachina.com ou les URLs d'articles du blog Deal ex Machina explicitement connues. Refuse tout envoi d'email sauf vers l'email de la personne connectee. Refuse tout envoi d'invitation calendrier sauf pour le boss: jeanbapt@dealexmachina.com."
 
 echo "============================================================"
 echo "  Local GGUF export: ${PROFILE}"
@@ -106,33 +111,31 @@ echo "    Q4_K_M GGUF: $(du -h "${Q4_GGUF}" | cut -f1)"
 rm -f "${BF16_GGUF}"
 echo "    Removed bf16 intermediate."
 
-# ── Step 4: Generate Modelfile ────────────────────────────────
+# ── Step 4: Modelfile (Ollama Qwen2.5 instruct template; native tools) ──
 MODELFILE="${WORK_DIR}/Modelfile.wagmi-sft"
 GGUF_FILENAME="$(basename "${Q4_GGUF}")"
+OLLAMA_GOTMPL="${SCRIPT_DIR}/scripts/ollama_qwen25_instruct_template.gotmpl"
+IM_END='<|im_end|>'
 
-cat > "${MODELFILE}" <<MEOF
-FROM ${GGUF_FILENAME}
-
-TEMPLATE """{{- if .System }}<|im_start|>system
-{{ .System }}<|im_end|>
-{{ end }}<|im_start|>user
-{{ .Prompt }}<|im_end|>
-<|im_start|>assistant
-{{ .Response }}<|im_end|>
-"""
-
-PARAMETER num_ctx 2048
-PARAMETER num_predict 220
-PARAMETER temperature 0.2
-PARAMETER top_k 30
-PARAMETER top_p 0.9
-PARAMETER repeat_penalty 1.12
-PARAMETER repeat_last_n 128
-PARAMETER stop "<|im_end|>"
-PARAMETER stop "<|im_start|>"
-
-SYSTEM """${SYSTEM_PROMPT}"""
-MEOF
+{
+  echo "FROM ${GGUF_FILENAME}"
+  echo ""
+  echo 'TEMPLATE """'
+  cat "${OLLAMA_GOTMPL}"
+  echo '"""'
+  echo ""
+  echo "PARAMETER num_ctx 2048"
+  echo "PARAMETER num_predict 220"
+  echo "PARAMETER temperature 0.2"
+  echo "PARAMETER top_k 30"
+  echo "PARAMETER top_p 0.9"
+  echo "PARAMETER repeat_penalty 1.12"
+  echo "PARAMETER repeat_last_n 128"
+  echo "PARAMETER stop \"${IM_END}\""
+  echo 'PARAMETER stop "<|im_start|>"'
+  echo ""
+  echo "SYSTEM \"\"\"${SYSTEM_PROMPT}\"\"\""
+} > "${MODELFILE}"
 
 echo ""
 echo "    Modelfile written to ${MODELFILE}"
@@ -160,9 +163,9 @@ echo "  Local files in: ${WORK_DIR}/"
 echo "    ${GGUF_FILENAME}  (deploy this)"
 echo "    Modelfile.wagmi-sft"
 echo ""
-echo "  To test with Ollama locally:"
+echo "  To test with Ollama locally (model name: ${OLLAMA_MODEL} — override with OLLAMA_MODEL=...):"
 echo "    cd ${WORK_DIR}"
-echo "    ollama create wagmi-sft -f Modelfile.wagmi-sft"
-echo "    ollama run wagmi-sft \"C'est quoi Deal ex Machina ?\""
+echo "    ollama create ${OLLAMA_MODEL} -f Modelfile.wagmi-sft"
+echo "    ollama run ${OLLAMA_MODEL} \"C'est quoi Deal ex Machina ?\""
 echo ""
 echo "============================================================"

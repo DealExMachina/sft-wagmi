@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATC
 
 ---
 
+## Unreleased
+
+### Security / governance
+
+- Added `eval_redteam.py`: adversarial guardrail test suite with automated PASS/FAIL checks.
+- Added `data/redteam_guardrail_cases.json` with bilingual red-team vectors across injection,
+  social engineering, unsafe links, contact hallucination, and action-policy abuse.
+- Added versioned AI Act-style report generation (`.json` + `.md`) under
+  `reports/redteam/v<version>/`.
+- Added pipeline support via `scripts/pipeline.py --redteam` and included red-team step in `--all`.
+
 ## 0.2.0 -- 2026-04-07
 
 Security hardening release. Adds 121 adversarial training entries across

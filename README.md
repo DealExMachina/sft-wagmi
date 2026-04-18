@@ -105,8 +105,10 @@ pip install -r requirements.txt
 Set `HF_TOKEN`, then:
 
 ```bash
-python3 train.py                           # small profile (default)
-MODEL_PROFILE=auth python3 train.py        # auth profile (14B)
+python3 train.py                                       # qwen small (default)
+MODEL_PROFILE=auth python3 train.py                    # qwen auth (14B)
+LLM_FAMILY=lfm2 python3 train.py                       # lfm2 small profile
+LLM_FAMILY=lfm2 MODEL_PROFILE=auth python3 train.py    # lfm2 auth profile
 ```
 
 The adapter is pushed to Hugging Face Hub with a version-tagged commit message.
@@ -136,6 +138,12 @@ Requires `OPENAI_API_KEY` and `HF_TOKEN`. Supports both `--profile small` and `-
 
 ## Export to Ollama / GGUF
 
+**Ollama names vs [dexm-one-page](https://github.com/DealExMachina/dexm-one-page) local dev:** after
+`ollama create`, the CLI shows tags like `wagmi-sft:latest` (small) and `wagmi-sft-14b:latest` (auth
+/ 14B). Use those strings in `LLM_MODEL`, `LLM_MODEL_AUTH`, etc. You can still use custom tags (e.g.
+`wagmi-sft:1.5b`) if your `ollama list` uses them—override env in dexm and `OLLAMA_MODEL` /
+`OLLAMA_MODEL_NAME` in this repo when exporting.
+
 The default pipeline uses a **hybrid** approach:
 
 1. **On HF Space (GPU):** `export_merged.py` merges the LoRA adapter into a
@@ -156,15 +164,37 @@ container. Invoked via `--export-gguf` in the pipeline.
 For auth profile tool-calling specialization (email + calendar), `train.py`
 auto-injects `data/tooling_email_calendar.jsonl` with 3x oversampling.
 
+Ollama **Modelfile** output (`export_gguf.py`, `scripts/export_ollama.py`,
+`scripts/local_gguf_export.sh`) embeds `scripts/ollama_qwen25_instruct_template.gotmpl`:
+the same tool-aware Go template as Ollama library `qwen2.5:*-instruct`, so
+**both** 1.5B and 14B Wagmi images accept native `/v1` `tools` (e.g. from
+dexm-one-page). Re-run export and `ollama create` to refresh existing local models.
+
+**Recréer les modèles Ollama localement (outils natifs)** : il faut un fichier **`.gguf`**
+sur disque (export Hugging Face, `scripts/export_ollama.py`, ou
+`scripts/local_gguf_export.sh`). Ensuite :
+
+```bash
+chmod +x scripts/recreate_ollama_wagmi.sh scripts/smoke_ollama_tools.sh
+./scripts/recreate_ollama_wagmi.sh small  /chemin/vers/wagmi-qwen2.5-1.5b-sft.q4_k_m.gguf
+./scripts/recreate_ollama_wagmi.sh auth   /chemin/vers/wagmi-qwen2.5-14b-sft.q4_k_m.gguf
+./scripts/smoke_ollama_tools.sh wagmi-sft:latest
+```
+
+`ollama rm wagmi-sft` échoue si le modèle n’existe pas (normal). Ne pas supprimer
+les modèles **avant** d’avoir un `.gguf` + Modelfile : sinon `ollama create` n’a
+rien à importer.
+
 ## One-command launcher
 
 Full pipeline (on L40 HF Space):
 
 ```bash
 python3 scripts/pipeline.py --all --profile auth
+python3 scripts/pipeline.py --all --family lfm2 --profile auth
 ```
 
-This runs: preflight -> merge `data/next/` -> train -> eval -> eval-rag -> export merged model to Hub.
+This runs: preflight -> merge `data/next/` -> train -> eval -> eval-rag -> redteam -> export merged model to Hub.
 
 Useful variants:
 
@@ -174,6 +204,7 @@ python3 scripts/pipeline.py --merge-next                    # merge data/next/ +
 python3 scripts/pipeline.py --merge-next --bump patch       # patch bump instead of minor
 python3 scripts/pipeline.py --profile auth --train
 python3 scripts/pipeline.py --train --export-merged         # train + push merged model
+python3 scripts/pipeline.py --profile auth --redteam        # versioned red-team report
 python3 scripts/pipeline.py --sync-dataset                  # sync from dexm-one-page
 python3 scripts/pipeline.py --autotune --profile auth       # requires OPENAI_API_KEY
 python3 scripts/pipeline.py --all --profile auth --dry-run  # preview full pipeline
@@ -187,7 +218,9 @@ After the Space completes, run locally on your Mac:
 
 Behavior:
 
-- **`--all`** chains: preflight -> merge-next -> train -> eval -> eval-rag -> export-merged.
+- **`--all`** chains: preflight -> merge-next -> train -> eval -> eval-rag -> redteam -> export-merged.
+- **`--redteam`** runs `eval_redteam.py`: executes adversarial guardrail checks and writes
+  version-linked reports under `reports/redteam/v<version>/` (`.json` + `.md`) for release traceability.
 - **`--merge-next`** runs `scripts/merge_next.py` which validates `data/next/*.jsonl`, appends to
   train/eval (85/15 split), updates `metadata.json`, bumps `VERSION`, and clears `data/next/`.
 - **`--export-merged`** runs `export_merged.py` (LoRA merge + push to Hub). GGUF conversion is local.
@@ -218,6 +251,23 @@ for the full history.
 3. Run the full pipeline: `python3 scripts/pipeline.py --all --profile auth`.
 4. Add a `CHANGELOG.md` entry, commit, and push.
 
+### Red-team report per version (AI Act traceability)
+
+After training (and before release), run:
+
+```bash
+python3 scripts/pipeline.py --profile auth --redteam
+python3 scripts/pipeline.py --profile small --redteam
+```
+
+Outputs:
+
+- `reports/redteam/v<version>/<profile>_redteam_<timestamp>.json`
+- `reports/redteam/v<version>/<profile>_redteam_<timestamp>.md`
+
+The markdown report includes release gate verdict, severity/category breakdown, failed vectors,
+and traceability notes aligned with EU AI Act robustness expectations.
+
 ## Repository structure
 
 ```
@@ -239,6 +289,7 @@ sft-wagmi/
 ├── eval_sft.py                      # Post-training eval
 ├── eval_sft_rag.py                  # Eval with RAG context
 ├── eval_tool_calls.py               # Tool-calling eval (auth profile)
+├── eval_redteam.py                  # Adversarial guardrail eval + versioned report
 ├── export_gguf.py                   # All-in-one GGUF export on Space (optional)
 ├── export_merged.py                 # LoRA merge + push merged model (default)
 ├── retrain_step.py                  # Helper for autotune merge/retrain
@@ -249,6 +300,7 @@ sft-wagmi/
 ├── requirements.txt
 ├── VERSION                          # Semver (current: 0.2.0)
 ├── CHANGELOG.md                     # Version history
+├── reports/redteam/                 # Version-linked red-team reports (AI Act traceability)
 └── README.md
 ```
 
