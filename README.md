@@ -21,14 +21,14 @@ app_port: 7860
 
 ---
 
-**Current version: `0.2.0`** (see [CHANGELOG.md](CHANGELOG.md))
+**Current version: `0.3.0`** (see [CHANGELOG.md](CHANGELOG.md))
 
-Fine-tune [Qwen 2.5](https://huggingface.co/Qwen) into **Wagmi**: a quantized assistant that answers questions about [Deal ex Machina](https://dealexmachina.com) in French and English, with guardrails against hallucination, prompt injection, and harmful content.
+Fine-tune [Qwen 2.5](https://huggingface.co/Qwen) or Liquid [LFM2](https://huggingface.co/collections/LiquidAI/lfm2-model-collection-67f8152be4674776f7de900e) into **Wagmi**: a quantized assistant that answers questions about [Deal ex Machina](https://dealexmachina.com) in French and English, with guardrails against hallucination, prompt injection, and harmful content.
 
-Two profiles ship today:
+Two serving profiles ship across both families (`LLM_FAMILY=qwen|lfm2`):
 
-- **small** (1.5B) -- CPU-friendly, ~1 GB Q4_K_M.
-- **auth** (14B) -- GPU-deployed on Koyeb, ~8.4 GB Q4_K_M, with tool-calling capabilities.
+- **small** -- anonymous tier, CPU-friendly target.
+- **auth** -- authenticated tier, tool-calling capable target.
 
 The stack has three layers:
 
@@ -85,13 +85,13 @@ That runs `npm run dataset:wagmi:refresh` in `../dexm-one-page` when that path e
 
 | Parameter | Value |
 | --- | --- |
-| Base model (small profile) | [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) |
+| Base model (small profile) | `qwen`: [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct), `lfm2`: [unsloth/LFM2.5-1.2B-Instruct](https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct) |
 | Method | LoRA (rank 32, alpha 64) |
 | Target modules | q/k/v/o + gate/up/down proj |
 | Max seq length | 2048 tokens |
-| Learning rate | 2e-4 (cosine decay) |
-| Epochs | 2 |
-| Effective batch | 16 (4 per device, grad accum 4) |
+| Learning rate | profile defaults from `train.py` (`small`: `5e-5`, `auth`: `2e-5`, cosine) |
+| Epochs | profile defaults from `train.py` (`small`: `3`, `auth`: `2`) |
+| Effective batch | profile defaults from `train.py` (`small`: `8`, `auth`: `8`) |
 | Precision | bf16 |
 | Framework | [Unsloth](https://github.com/unslothai/unsloth) + [TRL](https://github.com/huggingface/trl) |
 | Typical GPU | Hugging Face L40-class (48 GB VRAM) |
@@ -112,6 +112,19 @@ LLM_FAMILY=lfm2 MODEL_PROFILE=auth python3 train.py    # lfm2 auth profile
 ```
 
 The adapter is pushed to Hugging Face Hub with a version-tagged commit message.
+
+### Why `unsloth/...` IDs for LFM2
+
+When training via Unsloth (`FastLanguageModel`), this repo uses the Unsloth-compatible
+LFM2 IDs:
+
+- `unsloth/LFM2.5-1.2B-Instruct` (small)
+- `unsloth/LFM2-8B-A1B` (auth)
+
+Using upstream `LiquidAI/...` IDs in this Unsloth training path can fail with
+`NotImplementedError` depending on the installed Unsloth version. In other words:
+if the training stack is Unsloth, prefer `unsloth/...` model IDs; if you migrate to
+plain Transformers/PEFT, upstream `LiquidAI/...` IDs are valid.
 
 ## Autotune loop
 
@@ -224,7 +237,7 @@ Behavior:
 - **`--merge-next`** runs `scripts/merge_next.py` which validates `data/next/*.jsonl`, appends to
   train/eval (85/15 split), updates `metadata.json`, bumps `VERSION`, and clears `data/next/`.
 - **`--export-merged`** runs `export_merged.py` (LoRA merge + push to Hub). GGUF conversion is local.
-- **`--profile`**: `small` (Qwen 1.5B) or `auth` (Qwen 2.5 14B).
+- **`--profile`**: `small` or `auth` (base model selected by `--family` / `LLM_FAMILY`).
 - **`HF_TOKEN`**: Hub pull/push. **`OPENAI_API_KEY`**: autotune judge.
 - Large artifacts (adapters, merged models, GGUF) go to **HF Hub, not GitHub** (see `.gitignore`).
 
@@ -309,13 +322,16 @@ sft-wagmi/
 | Component | License | Link |
 | --- | --- | --- |
 | Qwen2.5-1.5B-Instruct | Apache 2.0 | [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) |
+| Qwen2.5-14B-Instruct | Apache 2.0 | [Qwen/Qwen2.5-14B-Instruct](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct) |
+| LFM2.5-1.2B-Instruct | LFM Open License v1.0 | [unsloth/LFM2.5-1.2B-Instruct](https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct) |
+| LFM2-8B-A1B | LFM Open License v1.0 | [unsloth/LFM2-8B-A1B](https://huggingface.co/unsloth/LFM2-8B-A1B) |
 | Unsloth | Apache 2.0 | [unslothai/unsloth](https://github.com/unslothai/unsloth) |
 | TRL | Apache 2.0 | [huggingface/trl](https://github.com/huggingface/trl) |
 | llama.cpp | MIT | [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) |
 | Ollama | MIT | [ollama/ollama](https://github.com/ollama/ollama) |
 | GPT-4o (judge) | Proprietary | [OpenAI](https://openai.com) |
 
-The LoRA adapter and SFT dataset are original work by [Deal ex Machina](https://dealexmachina.com). Base model weights remain the property of the Qwen team (Alibaba Cloud).
+The LoRA adapter and SFT dataset are original work by [Deal ex Machina](https://dealexmachina.com). Base model weights remain the property of their respective publishers (Qwen team / Liquid AI).
 
 ## EU AI Act compliance
 
