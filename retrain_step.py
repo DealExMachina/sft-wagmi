@@ -1,9 +1,16 @@
 """Retrain step — runs in a subprocess to isolate Unsloth monkey-patching.
 
-Usage: python retrain_step.py <train_jsonl> <eval_jsonl> <iteration>
+Usage:
+    python retrain_step.py <train_jsonl> <eval_jsonl> <iteration> [--family F] [--profile P]
+
+``--family`` / ``--profile`` are applied to the environment before Unsloth is
+imported so the correct base model is always loaded (avoids import-order / env
+merge issues with nested subprocesses).
 """
 
-import json
+from __future__ import annotations
+
+import argparse
 import os
 import sys
 import warnings
@@ -11,63 +18,99 @@ from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 
-import torch
-from datasets import load_dataset
-from transformers import TrainingArguments
-from unsloth import FastLanguageModel
-from trl import SFTTrainer
-from config import print_device_info, resolve_family, resolve_profile, resolve_profile_config
 
-warnings.filterwarnings(
-    "ignore",
-    message=r"The attention mask API under `transformers\.modeling_attn_mask_utils`.*",
-    category=FutureWarning,
-)
-
-LLM_FAMILY = resolve_family()
-MODEL_PROFILE = resolve_profile()
-cfg = resolve_profile_config(LLM_FAMILY, MODEL_PROFILE)
-
-BASE_MODEL_ID = cfg.model_id
-HUB_ADAPTER = cfg.hub_adapter
-OUTPUT_DIR = Path(cfg.adapter_dir)
-MAX_SEQ_LEN = cfg.max_seq_len
-DTYPE = torch.bfloat16
-HF_TOKEN = os.environ.get("HF_TOKEN", "")
-
-LORA_R = cfg.lora_r
-LORA_ALPHA = cfg.lora_alpha
-TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-LEARNING_RATE = cfg.learning_rate
-NUM_EPOCHS = cfg.num_epochs
-PER_DEVICE_BATCH = cfg.per_device_batch
-GRAD_ACCUM = cfg.grad_accum
-DATASET_NUM_PROC = cfg.dataset_num_proc
+def _parse_cli() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Autotune retrain subprocess (Unsloth SFT)")
+    p.add_argument("train_path", type=Path, help="Training JSONL path")
+    p.add_argument("eval_path", type=Path, help="Eval JSONL path")
+    p.add_argument("iteration", type=int, help="Autotune iteration index")
+    p.add_argument(
+        "--family",
+        default=None,
+        metavar="F",
+        help="LLM_FAMILY (qwen|qwen3|lfm2). When set, overrides env for this process.",
+    )
+    p.add_argument(
+        "--profile",
+        default=None,
+        choices=("small", "auth"),
+        metavar="P",
+        help="MODEL_PROFILE. When set, overrides env for this process.",
+    )
+    return p.parse_args()
 
 
-def main():
-    train_path = sys.argv[1]
-    eval_path = sys.argv[2]
-    iteration = int(sys.argv[3])
+def main() -> None:
+    args = _parse_cli()
+    if args.family is not None:
+        os.environ["LLM_FAMILY"] = str(args.family).strip().lower()
+    if args.profile is not None:
+        os.environ["MODEL_PROFILE"] = str(args.profile).strip().lower()
+
+    # Heavy imports only after CLI/env are final (Unsloth patches on import).
+    import torch
+    from datasets import load_dataset
+    from transformers import TrainingArguments
+    from trl import SFTTrainer
+    from unsloth import FastLanguageModel
+
+    from config import print_device_info, resolve_family, resolve_profile, resolve_profile_config
+
+    warnings.filterwarnings(
+        "ignore",
+        message=r"The attention mask API under `transformers\.modeling_attn_mask_utils`.*",
+        category=FutureWarning,
+    )
+
+    llm_family = resolve_family()
+    model_profile = resolve_profile()
+    cfg = resolve_profile_config(llm_family, model_profile)
+
+    base_model_id = cfg.model_id
+    hub_adapter = cfg.hub_adapter
+    output_dir = Path(cfg.adapter_dir)
+    max_seq_len = cfg.max_seq_len
+    dtype = torch.bfloat16
+    hf_token = os.environ.get("HF_TOKEN", "")
+
+    lora_r = cfg.lora_r
+    lora_alpha = cfg.lora_alpha
+    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    learning_rate = cfg.learning_rate
+    num_epochs = cfg.num_epochs
+    per_device_batch = cfg.per_device_batch
+    grad_accum = cfg.grad_accum
+    dataset_num_proc = cfg.dataset_num_proc
+
+    train_path = str(args.train_path)
+    eval_path = str(args.eval_path)
+    iteration = args.iteration
 
     print_device_info()
-    print(f"Family: {LLM_FAMILY}")
-    print(f"Profile: {MODEL_PROFILE}")
+    print(f"retrain_step: LLM_FAMILY={llm_family} MODEL_PROFILE={model_profile}")
+    print(f"retrain_step: base model = {base_model_id}")
     print(f"Retrain step: iteration {iteration}")
     print(f"Train data: {train_path}")
     print(f"Eval data: {eval_path}")
 
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=BASE_MODEL_ID, max_seq_length=MAX_SEQ_LEN,
-        dtype=DTYPE, load_in_4bit=bool(cfg.load_in_4bit),
+        model_name=base_model_id,
+        max_seq_length=max_seq_len,
+        dtype=dtype,
+        load_in_4bit=bool(cfg.load_in_4bit),
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     model = FastLanguageModel.get_peft_model(
-        model, r=LORA_R, lora_alpha=LORA_ALPHA, lora_dropout=0.0,
-        target_modules=TARGET_MODULES, bias="none",
-        use_gradient_checkpointing="unsloth", random_state=42,
+        model,
+        r=lora_r,
+        lora_alpha=lora_alpha,
+        lora_dropout=0.0,
+        target_modules=target_modules,
+        bias="none",
+        use_gradient_checkpointing="unsloth",
+        random_state=42,
     )
 
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -77,39 +120,57 @@ def main():
     raw = load_dataset("json", data_files={"train": train_path, "eval": eval_path})
 
     def format_chat(example):
-        return {"text": tokenizer.apply_chat_template(
-            example["messages"], tokenize=False, add_generation_prompt=False,
-        )}
+        return {
+            "text": tokenizer.apply_chat_template(
+                example["messages"],
+                tokenize=False,
+                add_generation_prompt=False,
+            )
+        }
 
     train_ds = raw["train"].map(format_chat, remove_columns=raw["train"].column_names)
     eval_ds = raw["eval"].map(format_chat, remove_columns=raw["eval"].column_names)
     print(f"Dataset: {len(train_ds)} train / {len(eval_ds)} eval")
 
-    out_dir = str(OUTPUT_DIR) + f"_iter{iteration}"
+    out_dir = str(output_dir) + f"_iter{iteration}"
 
     trainer = SFTTrainer(
-        model=model, tokenizer=tokenizer,
-        train_dataset=train_ds, eval_dataset=eval_ds,
-        dataset_text_field="text", max_seq_length=MAX_SEQ_LEN,
-        dataset_num_proc=DATASET_NUM_PROC, packing=False,
+        model=model,
+        tokenizer=tokenizer,
+        train_dataset=train_ds,
+        eval_dataset=eval_ds,
+        dataset_text_field="text",
+        max_seq_length=max_seq_len,
+        dataset_num_proc=dataset_num_proc,
+        packing=False,
         args=TrainingArguments(
             output_dir=out_dir,
-            num_train_epochs=NUM_EPOCHS,
-            per_device_train_batch_size=PER_DEVICE_BATCH,
-            per_device_eval_batch_size=PER_DEVICE_BATCH,
-            gradient_accumulation_steps=GRAD_ACCUM,
-            learning_rate=LEARNING_RATE,
+            num_train_epochs=num_epochs,
+            per_device_train_batch_size=per_device_batch,
+            per_device_eval_batch_size=per_device_batch,
+            gradient_accumulation_steps=grad_accum,
+            learning_rate=learning_rate,
             lr_scheduler_type="cosine",
-            warmup_steps=max(1, int((len(train_ds) / max(1, PER_DEVICE_BATCH * GRAD_ACCUM)) * NUM_EPOCHS * 0.05)),
-            weight_decay=0.01, max_grad_norm=1.0,
-            bf16=True, fp16=False, optim="adamw_8bit",
-            logging_steps=10, save_strategy="epoch", eval_strategy="epoch",
-            load_best_model_at_end=True, metric_for_best_model="eval_loss",
-            greater_is_better=False, report_to="none",
-            run_name=f"wagmi-{MODEL_PROFILE}-autotune-iter{iteration}",
+            warmup_steps=max(
+                1,
+                int((len(train_ds) / max(1, per_device_batch * grad_accum)) * num_epochs * 0.05),
+            ),
+            weight_decay=0.01,
+            max_grad_norm=1.0,
+            bf16=True,
+            fp16=False,
+            optim="adamw_8bit",
+            logging_steps=10,
+            save_strategy="epoch",
+            eval_strategy="epoch",
+            load_best_model_at_end=True,
+            metric_for_best_model="eval_loss",
+            greater_is_better=False,
+            report_to="none",
+            run_name=f"wagmi-{model_profile}-autotune-iter{iteration}",
             seed=42,
-            dataloader_num_workers=(0 if MODEL_PROFILE == "auth" else 2),
-            dataloader_pin_memory=(MODEL_PROFILE != "auth"),
+            dataloader_num_workers=(0 if model_profile == "auth" else 2),
+            dataloader_pin_memory=(model_profile != "auth"),
         ),
     )
 
@@ -120,17 +181,15 @@ def main():
     model.save_pretrained(out_dir)
     tokenizer.save_pretrained(out_dir)
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(str(OUTPUT_DIR))
-    tokenizer.save_pretrained(str(OUTPUT_DIR))
-    print(f"Adapter saved to {OUTPUT_DIR}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(str(output_dir))
+    tokenizer.save_pretrained(str(output_dir))
+    print(f"Adapter saved to {output_dir}")
 
-    if HF_TOKEN:
-        model.push_to_hub(HUB_ADAPTER, token=HF_TOKEN, private=True,
-                          commit_message=f"autotune iter {iteration}")
-        tokenizer.push_to_hub(HUB_ADAPTER, token=HF_TOKEN, private=True,
-                              commit_message=f"autotune iter {iteration}")
-        print(f"Pushed to {HUB_ADAPTER}")
+    if hf_token:
+        model.push_to_hub(hub_adapter, token=hf_token, private=True, commit_message=f"autotune iter {iteration}")
+        tokenizer.push_to_hub(hub_adapter, token=hf_token, private=True, commit_message=f"autotune iter {iteration}")
+        print(f"Pushed to {hub_adapter}")
 
     print("Retrain step complete.")
 

@@ -468,16 +468,31 @@ def merge_corrections(train_path: Path, corrections: list[dict], iteration: int)
 
 def retrain_via_subprocess(train_path: Path, eval_path: Path, iteration: int):
     """Run training in a subprocess to isolate Unsloth's monkey-patching."""
-    cmd = [sys.executable, "-u", "retrain_step.py", str(train_path), str(eval_path), str(iteration)]
+    # Re-read env at call time and pass explicit CLI flags so retrain_step fixes
+    # LLM_FAMILY/MODEL_PROFILE before importing Unsloth (avoids wrong base model).
+    family = resolve_family()
+    profile = resolve_profile()
+    cmd = [
+        sys.executable,
+        "-u",
+        "retrain_step.py",
+        str(train_path),
+        str(eval_path),
+        str(iteration),
+        "--family",
+        family,
+        "--profile",
+        profile,
+    ]
     print(f"  Launching subprocess: {' '.join(cmd)}")
-    print(f"  Retrain env: LLM_FAMILY={LLM_FAMILY} MODEL_PROFILE={MODEL_PROFILE}")
+    print(f"  Retrain env: LLM_FAMILY={family} MODEL_PROFILE={profile}")
     proc = subprocess.run(
         cmd,
         env={
             **os.environ,
             "PYTHONUNBUFFERED": "1",
-            "LLM_FAMILY": LLM_FAMILY,
-            "MODEL_PROFILE": MODEL_PROFILE,
+            "LLM_FAMILY": family,
+            "MODEL_PROFILE": profile,
         },
     )
     if proc.returncode != 0:
