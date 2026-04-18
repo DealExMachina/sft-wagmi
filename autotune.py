@@ -34,7 +34,7 @@ warnings.filterwarnings(
 )
 
 # ── Config ────────────────────────────────────────────────────────────────────
-from config import resolve_family, resolve_profile, resolve_profile_config
+from config import read_package_version, resolve_family, resolve_profile, resolve_profile_config
 
 LLM_FAMILY = resolve_family()
 MODEL_PROFILE = resolve_profile()
@@ -547,6 +547,12 @@ def run():
     assert OPENAI_API_KEY, "OPENAI_API_KEY not set in Space variables"
     client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
+    print(
+        f"sft-wagmi {read_package_version()} — autotune "
+        f"(LLM_FAMILY={LLM_FAMILY!r} MODEL_PROFILE={MODEL_PROFILE!r}; "
+        f"retrain subprocess uses retrain_step.py --family/--profile)",
+        flush=True,
+    )
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"Family: {LLM_FAMILY}")
     print(f"Profile: {MODEL_PROFILE}")

@@ -32,6 +32,16 @@ from __future__ import annotations
 import dataclasses
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+_PACKAGE_ROOT = Path(__file__).resolve().parent
+
+
+def read_package_version() -> str:
+    """Semver from the VERSION file next to this module (HF / SSH sanity checks)."""
+    vpath = _PACKAGE_ROOT / "VERSION"
+    return vpath.read_text().strip() if vpath.is_file() else "?"
+
 
 # ── Supported families and profiles ───────────────────────────────────────────
 

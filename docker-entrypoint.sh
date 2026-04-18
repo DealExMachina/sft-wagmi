@@ -24,4 +24,7 @@ export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-${_cache_base}/triton_cache}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${_cache_base}/.cache}"
 mkdir -p "${TRITON_CACHE_DIR}" "${XDG_CACHE_HOME}" 2>/dev/null || true
 chmod 777 "${TRITON_CACHE_DIR}" "${XDG_CACHE_HOME}" 2>/dev/null || true
+if [[ -f /app/VERSION ]]; then
+  echo "sft-wagmi: container /app/VERSION=$(tr -d '\r\n' </app/VERSION) (rebuild this Space after git push to refresh code in SSH)"
+fi
 exec "$@"

@@ -311,7 +311,7 @@ sft-wagmi/
 ├── Dockerfile                       # CUDA + deps image for HF Spaces
 ├── docker-entrypoint.sh             # Container init (HOME, cache dirs)
 ├── requirements.txt
-├── VERSION                          # Semver (current: 0.2.0)
+├── VERSION                          # Semver (see file; bump on pipeline-visible releases)
 ├── CHANGELOG.md                     # Version history
 ├── reports/redteam/                 # Version-linked red-team reports (AI Act traceability)
 └── README.md

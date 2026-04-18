@@ -42,6 +42,13 @@ def _parse_cli() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_cli()
+    _root = Path(__file__).resolve().parent
+    _ver = (_root / "VERSION").read_text().strip() if (_root / "VERSION").is_file() else "?"
+    print(
+        f"sft-wagmi retrain_step VERSION={_ver} argv={sys.argv!r} "
+        f"(expect --family/--profile before Unsloth import on 0.3.1+)",
+        flush=True,
+    )
     if args.family is not None:
         os.environ["LLM_FAMILY"] = str(args.family).strip().lower()
     if args.profile is not None:
