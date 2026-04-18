@@ -141,6 +141,8 @@ _REGISTRY: dict[str, dict[str, dict]] = {
     # Use unsloth/ IDs when training with Unsloth (FastLanguageModel).
     # Upstream LiquidAI/ IDs are valid for plain Transformers/PEFT only.
     "lfm2": {
+        # LFM2.5 small: align with Liquid Unsloth quick-start (r=16, alpha=32) and Unsloth LoRA
+        # guide (LR ~1e-4–2e-4 band, effective batch ~16). See docs.liquid.ai/lfm/fine-tuning/unsloth
         "small": {
             "model_id": "unsloth/LFM2.5-1.2B-Instruct",
             "adapter_dir": "output/wagmi-lfm2-small-sft",
@@ -150,12 +152,12 @@ _REGISTRY: dict[str, dict[str, dict]] = {
             "ollama_name": "wagmi-lfm2-small",
             "max_seq_len": 2048,
             "load_in_4bit": False,
-            "lora_r": 32,
-            "lora_alpha": 64,
-            "learning_rate": 5e-5,
+            "lora_r": 16,
+            "lora_alpha": 32,
+            "learning_rate": 1e-4,
             "num_epochs": 3,
-            "per_device_batch": 4,
-            "grad_accum": 2,
+            "per_device_batch": 2,
+            "grad_accum": 8,
             "dataset_num_proc": 2,
         },
         "auth": {
