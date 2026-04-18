@@ -136,7 +136,8 @@ def run():
 
     # Use the first (and likely only) GGUF file
     gguf_file = gguf_files[0]
-    target_name = f"{cfg['artifact_prefix']}.{QUANT}.gguf"
+    artifact_prefix = Path(ADAPTER_DIR).name
+    target_name = f"{artifact_prefix}.{QUANT}.gguf"
     target_path = GGUF_DIR / target_name
 
     if gguf_file.name != target_name:

@@ -59,7 +59,7 @@ def main():
 
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=BASE_MODEL_ID, max_seq_length=MAX_SEQ_LEN,
-        dtype=DTYPE, load_in_4bit=bool(cfg["load_in_4bit"]),
+        dtype=DTYPE, load_in_4bit=bool(cfg.load_in_4bit),
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token

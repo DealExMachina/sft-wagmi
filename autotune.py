@@ -75,6 +75,11 @@ EVAL_FILE = Path("data/eval.jsonl")
 OUTPUT_DIR = Path(ADAPTER_DIR)
 HISTORY_FILE = Path(f"output/{MODEL_PROFILE}_autotune_history.json")
 
+
+def _adapter_dir_ready(path: Path) -> bool:
+    """PEFT expects adapter_config.json at the adapter root."""
+    return (path / "adapter_config.json").is_file()
+
 CRITERIA = [
     "factual_accuracy", "language_match", "tone_persona",
     "guardrail_compliance", "conciseness", "hallucination_free",
@@ -535,7 +540,8 @@ def run():
     print(f"Max iterations: {MAX_ITERATIONS}, target: {SCORE_TARGET}/3.0\n")
 
     # small profile: vanilla transformers; auth profile: 4-bit Unsloth inference path.
-    adapter_path = str(OUTPUT_DIR) if OUTPUT_DIR.exists() else HUB_ADAPTER
+    # Only treat local dir as adapter if PEFT metadata exists (empty dirs break reload).
+    adapter_path = str(OUTPUT_DIR) if _adapter_dir_ready(OUTPUT_DIR) else HUB_ADAPTER
     print(f"Loading base model: {BASE_MODEL_ID}")
     print(f"Loading adapter: {adapter_path}")
 
@@ -547,7 +553,7 @@ def run():
             model_name=adapter_path,
             max_seq_length=MAX_SEQ_LEN,
             dtype=DTYPE,
-            load_in_4bit=bool(cfg["load_in_4bit"]),
+            load_in_4bit=bool(cfg.load_in_4bit),
         )
         FastLanguageModel.for_inference(model)
     else:
@@ -658,6 +664,18 @@ def run():
 
         retrain_via_subprocess(merged_path, EVAL_FILE, iteration)
 
+        if not _adapter_dir_ready(OUTPUT_DIR):
+            listing = (
+                sorted(p.name for p in OUTPUT_DIR.iterdir())
+                if OUTPUT_DIR.is_dir()
+                else "(directory missing)"
+            )
+            raise RuntimeError(
+                f"Retrain subprocess exited OK but local adapter is incomplete: "
+                f"missing {OUTPUT_DIR / 'adapter_config.json'}. "
+                f"Contents of {OUTPUT_DIR}: {listing}"
+            )
+
         # Reload with vanilla transformers for next iteration
         print(f"\n  Reloading model for next iteration ...")
         if MODEL_PROFILE == "auth":
@@ -667,7 +685,7 @@ def run():
                 model_name=str(OUTPUT_DIR),
                 max_seq_length=MAX_SEQ_LEN,
                 dtype=DTYPE,
-                load_in_4bit=bool(cfg["load_in_4bit"]),
+                load_in_4bit=bool(cfg.load_in_4bit),
             )
             FastLanguageModel.for_inference(model)
             base_model = None
