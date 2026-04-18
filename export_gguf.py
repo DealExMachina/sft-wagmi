@@ -27,14 +27,14 @@ def _profile_defaults(profile: str) -> dict[str, str]:
     if LLM_FAMILY == "lfm2":
         if profile == "small":
             return {
-                "base_model_id": "LiquidAI/LFM2.5-1.2B-Instruct",
+                "base_model_id": "unsloth/LFM2.5-1.2B-Instruct",
                 "hub_adapter": "jeanbaptdzd/wagmi-lfm2-small-sft",
                 "adapter_dir": "output/wagmi-lfm2-small-sft",
                 "hub_gguf_repo": "jeanbaptdzd/wagmi-lfm2-small-sft-gguf",
                 "artifact_prefix": "wagmi-lfm2-small-sft",
             }
         return {
-            "base_model_id": "LiquidAI/LFM2-8B-A1B",
+            "base_model_id": "unsloth/LFM2-8B-A1B",
             "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
             "adapter_dir": "output/wagmi-lfm2-auth-sft",
             "hub_gguf_repo": "jeanbaptdzd/wagmi-lfm2-auth-sft-gguf",

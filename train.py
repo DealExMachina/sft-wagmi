@@ -46,13 +46,13 @@ def _default_profile_config(profile: str) -> dict[str, str]:
     if LLM_FAMILY == "lfm2":
         if profile == "small":
             return {
-                "model_id": "LiquidAI/LFM2.5-1.2B-Instruct",
+                "model_id": "unsloth/LFM2.5-1.2B-Instruct",
                 "output_dir": "output/wagmi-lfm2-small-sft",
                 "hub_model_id": "jeanbaptdzd/wagmi-lfm2-small-sft",
                 "run_name": "wagmi-lfm2-small",
             }
         return {
-            "model_id": "LiquidAI/LFM2-8B-A1B",
+            "model_id": "unsloth/LFM2-8B-A1B",
             "output_dir": "output/wagmi-lfm2-auth-sft",
             "hub_model_id": "jeanbaptdzd/wagmi-lfm2-auth-sft",
             "run_name": "wagmi-lfm2-auth",
@@ -145,9 +145,16 @@ AUTH_TOOLING_FILE = os.environ.get("AUTH_TOOLING_FILE", "data/tooling_email_cale
 AUTH_TOOLING_MULTIPLIER = int(os.environ.get("AUTH_TOOLING_MULTIPLIER", "3"))
 
 
+def _print_device_info() -> None:
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    else:
+        print("GPU: none detected (CPU-only mode)")
+
+
 def run():
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
-    print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    _print_device_info()
     if MODEL_PROFILE == "auth":
         print(
             "Auth: default disables torch.compile (set AUTH_ENABLE_TORCH_COMPILE=1 on A100 80GB). "
@@ -245,7 +252,7 @@ def run():
             gradient_accumulation_steps=GRAD_ACCUM,
             learning_rate=LEARNING_RATE,
             lr_scheduler_type=LR_SCHEDULER,
-            warmup_ratio=WARMUP_RATIO,
+            warmup_steps=max(1, int((len(train_ds) / max(1, PER_DEVICE_BATCH * GRAD_ACCUM)) * NUM_EPOCHS * WARMUP_RATIO)),
             weight_decay=WEIGHT_DECAY,
             max_grad_norm=MAX_GRAD_NORM,
             bf16=BF16,

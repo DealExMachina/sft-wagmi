@@ -25,7 +25,7 @@ if LLM_FAMILY not in {"qwen", "lfm2"}:
 
 def _default_model_id(profile: str) -> str:
     if LLM_FAMILY == "lfm2":
-        return "LiquidAI/LFM2-8B-A1B" if profile == "auth" else "LiquidAI/LFM2.5-1.2B-Instruct"
+        return "unsloth/LFM2-8B-A1B" if profile == "auth" else "unsloth/LFM2.5-1.2B-Instruct"
     return "Qwen/Qwen2.5-14B-Instruct" if profile == "auth" else "Qwen/Qwen2.5-1.5B-Instruct"
 
 

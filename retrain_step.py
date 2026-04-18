@@ -24,13 +24,54 @@ warnings.filterwarnings(
 )
 
 MODEL_PROFILE = os.environ.get("MODEL_PROFILE", "small").strip().lower()
+LLM_FAMILY = os.environ.get("LLM_FAMILY", "qwen").strip().lower()
+if LLM_FAMILY not in {"qwen", "lfm2"}:
+    raise RuntimeError("Unsupported LLM_FAMILY. Expected one of: qwen, lfm2")
+
+
+def _defaults(profile: str) -> dict[str, str]:
+    if LLM_FAMILY == "lfm2":
+        if profile == "small":
+            return {
+                "base_model_id": "unsloth/LFM2.5-1.2B-Instruct",
+                "hub_adapter": "jeanbaptdzd/wagmi-lfm2-small-sft",
+                "output_dir": "output/wagmi-lfm2-small-sft",
+                "max_seq_len": "2048",
+                "load_in_4bit": "false",
+            }
+        return {
+            "base_model_id": "unsloth/LFM2-8B-A1B",
+            "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
+            "output_dir": "output/wagmi-lfm2-auth-sft",
+            "max_seq_len": "2048",
+            "load_in_4bit": "true",
+        }
+    if profile == "small":
+        return {
+            "base_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+            "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft",
+            "output_dir": "output/wagmi-qwen2.5-1.5b-sft",
+            "max_seq_len": "2048",
+            "load_in_4bit": "false",
+        }
+    return {
+        "base_model_id": "Qwen/Qwen2.5-14B-Instruct",
+        "hub_adapter": "jeanbaptdzd/wagmi-qwen2.5-14b-sft",
+        "output_dir": "output/wagmi-qwen2.5-14b-sft",
+        "max_seq_len": "2048",
+        "load_in_4bit": "true",
+    }
+
+
+SMALL_DEFAULTS = _defaults("small")
+AUTH_DEFAULTS = _defaults("auth")
 PROFILES = {
     "small": {
-        "base_model_id": os.environ.get("SMALL_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct"),
-        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"),
-        "output_dir": os.environ.get("SMALL_OUTPUT_DIR", "output/wagmi-qwen2.5-1.5b-sft"),
-        "max_seq_len": int(os.environ.get("SMALL_MAX_SEQ_LEN", "2048")),
-        "load_in_4bit": os.environ.get("SMALL_LOAD_IN_4BIT", "false").lower() == "true",
+        "base_model_id": os.environ.get("SMALL_MODEL_ID", SMALL_DEFAULTS["base_model_id"]),
+        "hub_adapter": os.environ.get("SMALL_HUB_MODEL_ID", SMALL_DEFAULTS["hub_adapter"]),
+        "output_dir": os.environ.get("SMALL_OUTPUT_DIR", SMALL_DEFAULTS["output_dir"]),
+        "max_seq_len": int(os.environ.get("SMALL_MAX_SEQ_LEN", SMALL_DEFAULTS["max_seq_len"])),
+        "load_in_4bit": os.environ.get("SMALL_LOAD_IN_4BIT", SMALL_DEFAULTS["load_in_4bit"]).lower() == "true",
         "lora_r": int(os.environ.get("SMALL_LORA_R", "32")),
         "lora_alpha": int(os.environ.get("SMALL_LORA_ALPHA", "64")),
         "learning_rate": float(os.environ.get("SMALL_LEARNING_RATE", "5e-5")),
@@ -40,11 +81,11 @@ PROFILES = {
         "dataset_num_proc": int(os.environ.get("SMALL_DATASET_NUM_PROC", "2")),
     },
     "auth": {
-        "base_model_id": os.environ.get("AUTH_MODEL_ID", "Qwen/Qwen2.5-14B-Instruct"),
-        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", "jeanbaptdzd/wagmi-qwen2.5-14b-sft"),
-        "output_dir": os.environ.get("AUTH_OUTPUT_DIR", "output/wagmi-qwen2.5-14b-sft"),
-        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", "2048")),
-        "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", "true").lower() != "false",
+        "base_model_id": os.environ.get("AUTH_MODEL_ID", AUTH_DEFAULTS["base_model_id"]),
+        "hub_adapter": os.environ.get("AUTH_HUB_MODEL_ID", AUTH_DEFAULTS["hub_adapter"]),
+        "output_dir": os.environ.get("AUTH_OUTPUT_DIR", AUTH_DEFAULTS["output_dir"]),
+        "max_seq_len": int(os.environ.get("AUTH_MAX_SEQ_LEN", AUTH_DEFAULTS["max_seq_len"])),
+        "load_in_4bit": os.environ.get("AUTH_LOAD_IN_4BIT", AUTH_DEFAULTS["load_in_4bit"]).lower() != "false",
         "lora_r": int(os.environ.get("AUTH_LORA_R", "32")),
         "lora_alpha": int(os.environ.get("AUTH_LORA_ALPHA", "64")),
         "learning_rate": float(os.environ.get("AUTH_LEARNING_RATE", "2e-5")),
@@ -75,12 +116,21 @@ GRAD_ACCUM = int(cfg["grad_accum"])
 DATASET_NUM_PROC = int(cfg["dataset_num_proc"])
 
 
+def _print_device_info() -> None:
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    else:
+        print("GPU: none detected (CPU-only mode)")
+
+
 def main():
     train_path = sys.argv[1]
     eval_path = sys.argv[2]
     iteration = int(sys.argv[3])
 
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    _print_device_info()
+    print(f"Family: {LLM_FAMILY}")
     print(f"Profile: {MODEL_PROFILE}")
     print(f"Retrain step: iteration {iteration}")
     print(f"Train data: {train_path}")
@@ -129,7 +179,8 @@ def main():
             gradient_accumulation_steps=GRAD_ACCUM,
             learning_rate=LEARNING_RATE,
             lr_scheduler_type="cosine",
-            warmup_ratio=0.05, weight_decay=0.01, max_grad_norm=1.0,
+            warmup_steps=max(1, int((len(train_ds) / max(1, PER_DEVICE_BATCH * GRAD_ACCUM)) * NUM_EPOCHS * 0.05)),
+            weight_decay=0.01, max_grad_norm=1.0,
             bf16=True, fp16=False, optim="adamw_8bit",
             logging_steps=10, save_strategy="epoch", eval_strategy="epoch",
             load_best_model_at_end=True, metric_for_best_model="eval_loss",

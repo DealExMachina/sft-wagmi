@@ -30,7 +30,7 @@ DEFAULT_BASE_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
 DEFAULT_OLLAMA_MODEL_NAME = "wagmi-sft"
 if LLM_FAMILY == "lfm2":
     DEFAULT_ADAPTER_HUB_ID = "jeanbaptdzd/wagmi-lfm2-small-sft"
-    DEFAULT_BASE_MODEL_ID = "LiquidAI/LFM2.5-1.2B-Instruct"
+    DEFAULT_BASE_MODEL_ID = "unsloth/LFM2.5-1.2B-Instruct"
     DEFAULT_OLLAMA_MODEL_NAME = "wagmi-lfm2-small"
 
 ADAPTER_HUB_ID = os.environ.get("ADAPTER_HUB_ID", DEFAULT_ADAPTER_HUB_ID)

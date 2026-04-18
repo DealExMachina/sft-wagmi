@@ -4,6 +4,7 @@ __pycache__/
 .cache/
 .claude/
 .venv-gguf/
+unsloth_compiled_cache/
 
 # Large model artifacts -- never commit to GitHub.
 # Adapters, merged models, GGUF, safetensors, checkpoints all go to HF Hub.
