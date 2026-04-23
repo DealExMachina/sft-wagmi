@@ -84,7 +84,8 @@ _REGISTRY: dict[str, dict[str, dict]] = {
             "hub_merged": "jeanbaptdzd/wagmi-qwen2.5-14b-sft-merged",
             "hub_gguf": "jeanbaptdzd/wagmi-qwen2.5-14b-sft-gguf",
             "ollama_name": "wagmi-sft-14b",
-            "max_seq_len": 2048,
+            # L40 (44GB) headroom can be tight with fused CE kernels; 1024 keeps auth training stable on Space.
+            "max_seq_len": 1024,
             "load_in_4bit": True,
             "lora_r": 32,
             "lora_alpha": 64,
