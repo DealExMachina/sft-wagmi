@@ -45,13 +45,27 @@ def gpu_info():
 
 
 def run_script(script: str, profile: str = "small", family: str = "qwen"):
+    extra_env = {}
+    if profile == "auth" and family == "qwen":
+        # Keep 14B auth runs stable on L40 (44GB) in Spaces.
+        extra_env["AUTH_MAX_SEQ_LEN"] = os.environ.get("AUTH_MAX_SEQ_LEN", "1024")
+        extra_env["PYTORCH_CUDA_ALLOC_CONF"] = os.environ.get(
+            "PYTORCH_CUDA_ALLOC_CONF",
+            "expandable_segments:True",
+        )
     proc = subprocess.Popen(
         [sys.executable, "-u", script],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
-        env={**os.environ, "PYTHONUNBUFFERED": "1", "MODEL_PROFILE": profile, "LLM_FAMILY": family},
+        env={
+            **os.environ,
+            **extra_env,
+            "PYTHONUNBUFFERED": "1",
+            "MODEL_PROFILE": profile,
+            "LLM_FAMILY": family,
+        },
     )
     output = ""
     for line in iter(proc.stdout.readline, ""):
@@ -119,13 +133,26 @@ def run_merge_next():
 
 
 def run_full_pipeline(profile: str, family: str):
+    extra_env = {}
+    if profile == "auth" and family == "qwen":
+        extra_env["AUTH_MAX_SEQ_LEN"] = os.environ.get("AUTH_MAX_SEQ_LEN", "1024")
+        extra_env["PYTORCH_CUDA_ALLOC_CONF"] = os.environ.get(
+            "PYTORCH_CUDA_ALLOC_CONF",
+            "expandable_segments:True",
+        )
     proc = subprocess.Popen(
         [sys.executable, "-u", "scripts/pipeline.py", "--all", "--profile", profile, "--family", family],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
-        env={**os.environ, "PYTHONUNBUFFERED": "1", "LLM_FAMILY": family, "MODEL_PROFILE": profile},
+        env={
+            **os.environ,
+            **extra_env,
+            "PYTHONUNBUFFERED": "1",
+            "LLM_FAMILY": family,
+            "MODEL_PROFILE": profile,
+        },
     )
     output = ""
     for line in iter(proc.stdout.readline, ""):
