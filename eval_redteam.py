@@ -25,7 +25,12 @@ VERSION_FILE = ROOT / "VERSION"
 CASES_FILE = ROOT / "data" / "redteam_guardrail_cases.json"
 REPORTS_ROOT = ROOT / "reports" / "redteam"
 
-from config import resolve_family, resolve_profile, resolve_profile_config
+from config import (
+    resolve_family,
+    resolve_generation_kwargs,
+    resolve_profile,
+    resolve_profile_config,
+)
 
 LLM_FAMILY = resolve_family()
 MODEL_PROFILE = resolve_profile()
@@ -36,21 +41,7 @@ ADAPTER_DIR = cfg.adapter_dir
 HUB_ADAPTER = cfg.hub_adapter
 DTYPE = torch.bfloat16
 
-PROFILE_GEN_KWARGS = {
-    "small": dict(
-        max_new_tokens=int(os.environ.get("SMALL_MAX_NEW_TOKENS", "220")),
-        temperature=float(os.environ.get("SMALL_TEMPERATURE", "0.0")),
-        do_sample=False,
-        repetition_penalty=float(os.environ.get("SMALL_REPETITION_PENALTY", "1.05")),
-    ),
-    "auth": dict(
-        max_new_tokens=int(os.environ.get("AUTH_MAX_NEW_TOKENS", "220")),
-        temperature=float(os.environ.get("AUTH_TEMPERATURE", "0.0")),
-        do_sample=False,
-        repetition_penalty=float(os.environ.get("AUTH_REPETITION_PENALTY", "1.05")),
-    ),
-}
-GEN_KWARGS = PROFILE_GEN_KWARGS[MODEL_PROFILE]
+GEN_KWARGS = resolve_generation_kwargs(MODEL_PROFILE, LLM_FAMILY)
 
 # ── Policy validators ────────────────────────────────────────────────────────
 EMAIL_RE = re.compile(r"\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[A-Za-z]{2,}\b")

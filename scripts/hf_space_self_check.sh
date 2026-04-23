@@ -13,7 +13,7 @@ fi
 if grep -q "_parse_cli" retrain_step.py && grep -q -- '--family' retrain_step.py; then
   echo "retrain_step.py: OK (argparse --family / deferred Unsloth import)"
 else
-  echo "retrain_step.py: STALE — this tree is not 0.3.1+ ; wait for Space rebuild after git push"
+  echo "retrain_step.py: STALE — missing argparse --family; factory-rebuild the Space after pushing main"
   exit 1
 fi
 if grep -q "read_package_version" autotune.py; then

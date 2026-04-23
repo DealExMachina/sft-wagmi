@@ -12,434 +12,179 @@ app_port: 7860
 <p align="center">
   <a href="https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct"><img src="https://img.shields.io/badge/Small-Qwen_2.5_1.5B-blue?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==" alt="Qwen 2.5 1.5B"></a>
   <a href="https://huggingface.co/Qwen/Qwen2.5-14B-Instruct"><img src="https://img.shields.io/badge/Auth-Qwen_2.5_14B-blue?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==" alt="Qwen 2.5 14B"></a>
+  <a href="https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct"><img src="https://img.shields.io/badge/Small-LFM2.5_1.2B-teal?logo=huggingface" alt="LFM2.5 1.2B Unsloth mirror"></a>
+  <a href="https://huggingface.co/unsloth/LFM2-8B-A1B"><img src="https://img.shields.io/badge/Auth-LFM2_8B-teal?logo=huggingface" alt="LFM2 8B Unsloth mirror"></a>
+  <a href="https://huggingface.co/collections/LiquidAI/lfm2-model-collection-67f8152be4674776f7de900e"><img src="https://img.shields.io/badge/Liquid_AI-LFM2-0d9488?logo=huggingface" alt="Liquid AI LFM2 collection"></a>
+</p>
+<p align="center">
   <a href="https://github.com/unslothai/unsloth"><img src="https://img.shields.io/badge/Training-Unsloth-orange?logo=github" alt="Unsloth"></a>
   <a href="https://huggingface.co/jeanbaptdzd/wagmi-qwen2.5-1.5b-sft"><img src="https://img.shields.io/badge/HuggingFace-Adapter-yellow?logo=huggingface" alt="HuggingFace"></a>
   <a href="https://ollama.com"><img src="https://img.shields.io/badge/Inference-Ollama-black?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiIGZpbGw9IndoaXRlIi8+PC9zdmc+" alt="Ollama"></a>
+  <a href="https://github.com/ggerganov/llama.cpp"><img src="https://img.shields.io/badge/llama.cpp-GGUF%20%26%20server_(eval)-654321?logo=github&logoColor=white" alt="llama.cpp"></a>
   <a href="https://openai.com"><img src="https://img.shields.io/badge/Judge-GPT--4o-412991?logo=openai&logoColor=white" alt="GPT-4o"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-green" alt="License"></a>
+  <a href="#attribution-and-licensing"><img src="https://img.shields.io/badge/License-multi--see_table-slategray" alt="Licenses"></a>
 </p>
 
 ---
 
-**Current version: `0.3.0`** (see [CHANGELOG.md](CHANGELOG.md))
+**Version `0.3.4`.** History: [CHANGELOG.md](CHANGELOG.md).
 
-Fine-tune [Qwen 2.5](https://huggingface.co/Qwen) or Liquid [LFM2](https://huggingface.co/collections/LiquidAI/lfm2-model-collection-67f8152be4674776f7de900e) into **Wagmi**: a quantized assistant that answers questions about [Deal ex Machina](https://dealexmachina.com) in French and English, with guardrails against hallucination, prompt injection, and harmful content.
+SFT and export for **Wagmi** (bilingual assistant for [Deal ex Machina](https://dealexmachina.com)). Base families: **Qwen 2.5** (`LLM_FAMILY=qwen`) and **Liquid LFM2** (`LLM_FAMILY=lfm2`). Profiles: **`small`** (anonymous tier), **`auth`** (tool-capable tier). Training: [Unsloth](https://github.com/unslothai/unsloth) + [TRL](https://github.com/huggingface/trl). Default Hub checkpoints for LFM2 and Qwen3 training paths use **`unsloth/...`** IDs (see Training). Production inference is **Ollama** today; **llama.cpp** is used for GGUF conversion and is under evaluation as a direct OpenAI-compatible server ([dexm-one-page](https://github.com/DealExMachina/dexm-one-page): `LLM_RUNTIME=llamacpp`, `LLM_API_URL_*`).
 
-Two serving profiles ship across both families (`LLM_FAMILY=qwen|lfm2`):
+Downstream site couples **RAG** ([`local-rag.ts`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/local-rag.ts)), **SFT** (this repo’s JSONL), and optional **autotune** (GPT-4o judge loop in `autotune.py`).
 
-- **small** -- anonymous tier, CPU-friendly target.
-- **auth** -- authenticated tier, tool-calling capable target.
+## Dataset
 
-The stack has three layers:
-
-1. **RAG** — BM25-style local retrieval injects verified facts into the system prompt at inference time in the site ([`local-rag.ts`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/local-rag.ts)).
-2. **SFT** — JSONL chat examples generated from repo content (see below); identity, tone, uncertainty, and refusal reflexes.
-3. **Autotune** — iterative judge–correct–retrain loop with GPT-4o scoring on six criteria until convergence (small + auth profiles).
-
-**Dataset snapshot** (from `data/metadata.json` after sync; regenerate to refresh):
-
-| | Train | Eval | Total |
-| --- | --- | --- | --- |
-| Examples | 663 | 117 | **780** |
-| EN | 347 | | |
-| FR | 433 | | |
-
-Source mix (same generation run, `bySourceType`):
-
-| Type | Rows | Role |
-| --- | ---: | --- |
-| `content` | 440 | Chunked blog + site markdown |
-| `obsidian` | 140 | Optional vault notes (`wagmi_sft` / `sft` frontmatter, `OBSIDIAN_VAULT_PATH` in dexm) |
-| `synthetic:guardrail` | 112 | Identity, refusal, uncertainty, auth nudges |
-| `synthetic:grounded-qa` | 34 | Grounded Q&A |
-| `synthetic:wagmi-qa` | 28 | Direct Wagmi / company Q&A |
-| `synthetic:hard-negative` | 18 | Corrections of known bad patterns |
-| `synthetic:multi-turn` | 8 | Multi-turn coherence |
-
-Underlying content includes [`wagmi-skills.md`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/wagmi-skills.md), [`ai.txt`](https://github.com/DealExMachina/dexm-one-page/blob/dev/public/ai.txt), bilingual blog posts, and optional Obsidian. **Authoritative counts** after each generation live in `dexm-one-page/datasets/wagmi-sft/metadata.json`.
-
-## Regenerating and syncing the dataset
-
-From **dexm-one-page** (sibling repo):
+Authoritative row counts and distributions: **`data/metadata.json`** (updated by `merge_next.py` or dataset sync from dexm). Regenerate from the site repo:
 
 ```bash
-cd ../dexm-one-page
-npm run dataset:wagmi:refresh   # generate JSONL + copy to ../sft-wagmi/data
+cd ../dexm-one-page && pnpm run dataset:wagmi:refresh   # or pnpm run dataset:wagmi:sync
 ```
 
-Or only copy already-generated files:
+From here:
 
 ```bash
-npm run dataset:wagmi:sync
+python3 scripts/pipeline.py --sync-dataset   # subprocess: npm run dataset:wagmi:refresh in ../dexm-one-page
 ```
 
-Or from **this repo**:
+## Pipeline
 
-```bash
-python3 scripts/pipeline.py --sync-dataset
-```
-
-That runs `npm run dataset:wagmi:refresh` in `../dexm-one-page` when that path exists.
-
-## Training
-
-| Parameter | Value |
+| File | Role |
 | --- | --- |
-| Base model (small profile) | `qwen`: [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct), `lfm2`: [unsloth/LFM2.5-1.2B-Instruct](https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct) |
-| Method | LoRA (rank 32, alpha 64) |
-| Target modules | q/k/v/o + gate/up/down proj |
-| Max seq length | 2048 tokens |
-| Learning rate | profile defaults from `train.py` (`small`: `5e-5`, `auth`: `2e-5`, cosine) |
-| Epochs | profile defaults from `train.py` (`small`: `3`, `auth`: `2`) |
-| Effective batch | profile defaults from `train.py` (`small`: `8`, `auth`: `8`) |
-| Precision | bf16 |
-| Framework | [Unsloth](https://github.com/unslothai/unsloth) + [TRL](https://github.com/huggingface/trl) |
-| Typical GPU | Hugging Face L40-class (48 GB VRAM) |
+| [`scripts/pipeline.py`](scripts/pipeline.py) | CLI: loads `.env`, sets `MODEL_PROFILE` / `LLM_FAMILY` for subprocesses. |
+| [`config.py`](config.py) | `_REGISTRY`, `resolve_profile_config()`; overrides via `SMALL_*` / `AUTH_*` env (see module docstring). |
 
-### Run training
+**`--all`:** `preflight` → `merge-next` (only if `data/next/*.jsonl` exist) → `train` → `eval` → `eval-rag` → `redteam` → `export-merged`. Does not run `baseline`, `autotune`, or `export-gguf` unless requested.
 
-```bash
-pip install -r requirements.txt
-```
+**Flags:** `--profile small|auth`, `--family qwen|lfm2` (defaults from env; **`qwen3`** exists in `config.py` only for direct `python3 train.py` / eval until CLI adds it), `--sync-dataset`, `--merge-next [--bump patch|minor|major]`, `--dry-run`, per-step toggles as in `--help`.
 
-Set `HF_TOKEN`, then:
-
-```bash
-python3 train.py                                       # qwen small (default)
-MODEL_PROFILE=auth python3 train.py                    # qwen auth (14B)
-LLM_FAMILY=lfm2 python3 train.py                       # lfm2 small profile
-LLM_FAMILY=lfm2 MODEL_PROFILE=auth python3 train.py    # lfm2 auth profile
-```
-
-The adapter is pushed to Hugging Face Hub with a version-tagged commit message.
-
-### Why `unsloth/...` IDs for LFM2
-
-When training via Unsloth (`FastLanguageModel`), this repo uses the Unsloth-compatible
-LFM2 IDs:
-
-- `unsloth/LFM2.5-1.2B-Instruct` (small)
-- `unsloth/LFM2-8B-A1B` (auth)
-
-Using upstream `LiquidAI/...` IDs in this Unsloth training path can fail with
-`NotImplementedError` depending on the installed Unsloth version. In other words:
-if the training stack is Unsloth, prefer `unsloth/...` model IDs; if you migrate to
-plain Transformers/PEFT, upstream `LiquidAI/...` IDs are valid.
-
-## Autotune loop
-
-`autotune.py` implements the self-improvement loop:
-
-```
-[SFT model] --> inference on eval prompts (with RAG context where configured)
-     |
-     v
-[GPT-4o judge] --> scores on 6 criteria (0-3 each)
-     |              factual_accuracy, language_match, tone_persona,
-     |              guardrail_compliance, conciseness, hallucination_free
-     v
-[GPT-4o corrector] --> ideal responses for failures (total < 14/18)
-     |
-     v
-[Merge corrections] --> retrain --> push to Hub
-     |
-     v
-[Repeat] --> until mean score > 2.5/3.0 or 3 iterations
-```
-
-Requires `OPENAI_API_KEY` and `HF_TOKEN`. Supports both `--profile small` and `--profile auth`.
-
-## Export to Ollama / GGUF
-
-**Ollama names vs [dexm-one-page](https://github.com/DealExMachina/dexm-one-page) local dev:** after
-`ollama create`, the CLI shows tags like `wagmi-sft:latest` (small) and `wagmi-sft-14b:latest` (auth
-/ 14B). Use those strings in `LLM_MODEL`, `LLM_MODEL_AUTH`, etc. You can still use custom tags (e.g.
-`wagmi-sft:1.5b`) if your `ollama list` uses them—override env in dexm and `OLLAMA_MODEL` /
-`OLLAMA_MODEL_NAME` in this repo when exporting.
-
-The default pipeline uses a **hybrid** approach:
-
-1. **On HF Space (GPU):** `export_merged.py` merges the LoRA adapter into a
-   full BF16 model and pushes it to Hub.
-2. **Locally (Mac/Linux):** `scripts/local_gguf_export.sh` downloads the merged
-   model, converts to GGUF with llama.cpp, quantizes to Q4_K_M, and pushes the
-   GGUF + Modelfile back to Hub.
-
-```bash
-# After training completes on Space:
-./scripts/local_gguf_export.sh auth
-```
-
-**Alternative (all-in-one on GPU):** `export_gguf.py` does merge + GGUF + push
-in a single step on the Space, useful when llama.cpp is available in the
-container. Invoked via `--export-gguf` in the pipeline.
-
-For auth profile tool-calling specialization (email + calendar), `train.py`
-auto-injects `data/tooling_email_calendar.jsonl` with 3x oversampling.
-
-Ollama **Modelfile** output (`export_gguf.py`, `scripts/export_ollama.py`,
-`scripts/local_gguf_export.sh`) embeds `scripts/ollama_qwen25_instruct_template.gotmpl`:
-the same tool-aware Go template as Ollama library `qwen2.5:*-instruct`, so
-**both** 1.5B and 14B Wagmi images accept native `/v1` `tools` (e.g. from
-dexm-one-page). Re-run export and `ollama create` to refresh existing local models.
-
-**Recréer les modèles Ollama localement (outils natifs)** : il faut un fichier **`.gguf`**
-sur disque (export Hugging Face, `scripts/export_ollama.py`, ou
-`scripts/local_gguf_export.sh`). Ensuite :
-
-```bash
-chmod +x scripts/recreate_ollama_wagmi.sh scripts/smoke_ollama_tools.sh
-./scripts/recreate_ollama_wagmi.sh small  /chemin/vers/wagmi-qwen2.5-1.5b-sft.q4_k_m.gguf
-./scripts/recreate_ollama_wagmi.sh auth   /chemin/vers/wagmi-qwen2.5-14b-sft.q4_k_m.gguf
-./scripts/smoke_ollama_tools.sh wagmi-sft:latest
-```
-
-`ollama rm wagmi-sft` échoue si le modèle n’existe pas (normal). Ne pas supprimer
-les modèles **avant** d’avoir un `.gguf` + Modelfile : sinon `ollama create` n’a
-rien à importer.
-
-## One-command launcher
-
-Full pipeline (on L40 HF Space):
+**Artifacts:** large files on Hugging Face Hub, not git ([`.gitignore`](.gitignore)). **Secrets:** `HF_TOKEN` (Hub), `OPENAI_API_KEY` (autotune).
 
 ```bash
 python3 scripts/pipeline.py --all --profile auth
 python3 scripts/pipeline.py --all --family lfm2 --profile auth
-```
-
-This runs: preflight -> merge `data/next/` -> train -> eval -> eval-rag -> redteam -> export merged model to Hub.
-
-Useful variants:
-
-```bash
 python3 scripts/pipeline.py --preflight --dry-run
-python3 scripts/pipeline.py --merge-next                    # merge data/next/ + bump version
-python3 scripts/pipeline.py --merge-next --bump patch       # patch bump instead of minor
-python3 scripts/pipeline.py --profile auth --train
-python3 scripts/pipeline.py --train --export-merged         # train + push merged model
-python3 scripts/pipeline.py --profile auth --redteam        # versioned red-team report
-python3 scripts/pipeline.py --sync-dataset                  # sync from dexm-one-page
-python3 scripts/pipeline.py --autotune --profile auth       # requires OPENAI_API_KEY
-python3 scripts/pipeline.py --all --profile auth --dry-run  # preview full pipeline
 ```
 
-After the Space completes, run locally on your Mac:
+After `export-merged` on the Space, local GGUF (typical): `./scripts/local_gguf_export.sh <profile>`. **Gradio:** [`app.py`](app.py) exposes the same steps (including merge-from-`data/next/`).
+
+## Training
+
+| Item | Value |
+| --- | --- |
+| Bases | `qwen`: [Qwen2.5-1.5B](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) / [14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct); `lfm2`: [unsloth/LFM2.5-1.2B-Instruct](https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct) / [unsloth/LFM2-8B-A1B](https://huggingface.co/unsloth/LFM2-8B-A1B) |
+| LoRA / LR / batch | Defaults in [`config.py`](config.py) `_REGISTRY`: **qwen** small/auth use r=32, α=64, LR `5e-5` / `2e-5`. **lfm2** small: r=16, α=32, LR `1e-4`, `per_device_batch` 2, `grad_accum` 8 (effective batch 16). **lfm2** auth: r=32, α=64, LR `2e-5`. Override with `SMALL_*` / `AUTH_*` env. |
+| Other | Max seq 2048, bf16, cosine schedule, q/k/v/o + MLP targets (see `train.py`). Stack: Unsloth `FastLanguageModel` + TRL `SFTTrainer`. |
 
 ```bash
-./scripts/local_gguf_export.sh auth   # download merged, convert GGUF, push to Hub
+pip install -r requirements.txt
+export HF_TOKEN=...
+
+python3 train.py
+MODEL_PROFILE=auth python3 train.py
+LLM_FAMILY=lfm2 python3 train.py
+LLM_FAMILY=lfm2 MODEL_PROFILE=auth python3 train.py
 ```
 
-Behavior:
+**Hub IDs:** Unsloth’s loader expects checkpoints it supports; `unsloth/*` repos are the supported builds. Upstream `LiquidAI/*` (or other) IDs on the same code path can raise `NotImplementedError` depending on Unsloth version. For plain Transformers/PEFT or for GGUF built outside Unsloth, use the license and files attached to the checkpoint you actually load. LFM weights: [LFM Open License v1.0](https://liquid.ai/lfm-license) (not Apache 2.0). Summary: [Attribution and licensing](#attribution-and-licensing).
 
-- **`--all`** chains: preflight -> merge-next -> train -> eval -> eval-rag -> redteam -> export-merged.
-- **`--redteam`** runs `eval_redteam.py`: executes adversarial guardrail checks and writes
-  version-linked reports under `reports/redteam/v<version>/` (`.json` + `.md`) for release traceability.
-- **`--merge-next`** runs `scripts/merge_next.py` which validates `data/next/*.jsonl`, appends to
-  train/eval (85/15 split), updates `metadata.json`, bumps `VERSION`, and clears `data/next/`.
-- **`--export-merged`** runs `export_merged.py` (LoRA merge + push to Hub). GGUF conversion is local.
-- **`--profile`**: `small` or `auth` (base model selected by `--family` / `LLM_FAMILY`).
-- **`HF_TOKEN`**: Hub pull/push. **`OPENAI_API_KEY`**: autotune judge.
-- Large artifacts (adapters, merged models, GGUF) go to **HF Hub, not GitHub** (see `.gitignore`).
+**Auth tooling:** `train.py` merges `data/tooling_email_calendar.jsonl` with oversampling (`AUTH_TOOLING_MULTIPLIER`, default 3).
 
-**HF Spaces / Gradio:** `app.py` mirrors the same flow in a UI with a "0. Merge Next Data" tab.
+**Generation (eval / autotune / baseline):** `config.resolve_generation_kwargs()`: for `lfm2`, defaults are sampling-style (`temperature`, `top_p`, `top_k`, `repetition_penalty`); for `qwen` / `qwen3`, greedy unless env overrides. Env: `SMALL_TEMPERATURE`, `SMALL_TOP_P`, `SMALL_TOP_K`, `AUTH_*` analogues; `SMALL_TEMPERATURE=0` forces greedy LFM2. Training LR tweaks: use `SMALL_LEARNING_RATE` etc.; eval/train checkpoint selection stays in `train.py` / `retrain_step.py`.
+
+## Hugging Face Space
+
+**App:** [spaces/jeanbaptdzd/sft-wagmi](https://huggingface.co/spaces/jeanbaptdzd/sft-wagmi) (Gradio on port 7860). Git remote for pushes: `https://huggingface.co/spaces/jeanbaptdzd/sft-wagmi`. If the Space is **private**, unauthenticated HTTP checks return 401; open it while logged into Hugging Face.
+
+After a git push to the Space branch, use a **factory rebuild** (not only Restart) so the image includes the current tree and `/app/VERSION` matches [`VERSION`](VERSION). Verify with `cat /app/VERSION` over SSH or logs. Optional: `bash scripts/hf_space_self_check.sh` from repo root.
+
+**LFM2 small (1.2B Instruct), sequential commands:**
+
+```bash
+export LLM_FAMILY=lfm2 MODEL_PROFILE=small
+python3 train.py
+python3 eval_sft.py && python3 eval_sft_rag.py && python3 eval_redteam.py
+# or: python3 scripts/pipeline.py --all --family lfm2 --profile small
+```
+
+## Autotune
+
+`autotune.py`: generate on eval set → GPT-4o scores six criteria (0–3) → corrector for failures → merge → retrain → Hub push; repeat until mean score > 2.5/3 or three iterations. Requires `OPENAI_API_KEY` and `HF_TOKEN`.
+
+## Export (merged model, GGUF, Ollama)
+
+1. **Space:** `export_merged.py` (LoRA merged to BF16, push Hub). Pipeline: `--export-merged` (included in `--all`).
+2. **Local:** `scripts/local_gguf_export.sh`: pull merged weights, `convert_hf_to_gguf.py` + `llama-quantize` from llama.cpp, Q4_K_M, push GGUF + Modelfile.
+3. **Optional:** `export_gguf.py` on-GPU merge+GGUF; pipeline `--export-gguf`.
+
+**Dexm env names:** after `ollama create`, tags such as `wagmi-sft:latest` / `wagmi-sft-14b:latest` map to `LLM_MODEL` / `LLM_MODEL_AUTH`. Override in dexm and in this repo via `OLLAMA_MODEL` / `OLLAMA_MODEL_NAME` if your tags differ.
+
+Modelfile generation uses [`scripts/ollama_qwen25_instruct_template.gotmpl`](scripts/ollama_qwen25_instruct_template.gotmpl) so Qwen-class exports follow the same tool template family as upstream `qwen2.5:*-instruct` images.
+
+**Local recreate:** need a `.gguf` on disk (Hub download or export scripts). Then:
+
+```bash
+chmod +x scripts/recreate_ollama_wagmi.sh scripts/smoke_ollama_tools.sh
+./scripts/recreate_ollama_wagmi.sh small  /path/to/wagmi-qwen2.5-1.5b-sft.q4_k_m.gguf
+./scripts/recreate_ollama_wagmi.sh auth   /path/to/wagmi-qwen2.5-14b-sft.q4_k_m.gguf
+./scripts/smoke_ollama_tools.sh wagmi-sft:latest
+```
+
+`ollama rm` on a missing model exits with an error; do not delete an existing model until a replacement GGUF and Modelfile exist.
+
+**llama.cpp serving (evaluation):** GGUF tooling is production; serving via llama.cpp’s HTTP `/v1` API instead of Ollama is not fully validated (tools, chat templates Qwen vs LFM2, deployment). Dexm switches with `LLM_RUNTIME=llamacpp` when endpoints are ready.
 
 ## Versioning
 
-Model versions follow [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
+Semver in [`VERSION`](VERSION): MAJOR = persona/base/schema break; MINOR = dataset or capability change; PATCH = hyperparameters or tooling. Release flow: add JSONL under `data/next/` → [`scripts/merge_next.py`](scripts/merge_next.py) → `pipeline.py --all` → [CHANGELOG.md](CHANGELOG.md) entry → commit.
 
-- **MAJOR**: breaking persona change, base model swap, or schema change.
-- **MINOR**: new dataset entries, new training profiles, new capabilities.
-- **PATCH**: hyperparameter tweaks, bug fixes, tooling improvements.
-
-The current version lives in `VERSION` at the repo root. It is read by `train.py`
-at startup and embedded in Hub commit messages. See [CHANGELOG.md](CHANGELOG.md)
-for the full history.
-
-### Preparing a new version
-
-1. Drop new `.jsonl` files into `data/next/` during development (see `data/next/README.md`
-   for the required schema).
-2. Merge them with `python3 scripts/merge_next.py --bump minor` (validates schema,
-   appends to train/eval, updates metadata, bumps VERSION).
-3. Run the full pipeline: `python3 scripts/pipeline.py --all --profile auth`.
-4. Add a `CHANGELOG.md` entry, commit, and push.
-
-### Red-team report per version (AI Act traceability)
-
-After training (and before release), run:
+## Red-team reports
 
 ```bash
 python3 scripts/pipeline.py --profile auth --redteam
 python3 scripts/pipeline.py --profile small --redteam
 ```
 
-Outputs:
+Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (release-gate style summary for internal traceability).
 
-- `reports/redteam/v<version>/<profile>_redteam_<timestamp>.json`
-- `reports/redteam/v<version>/<profile>_redteam_<timestamp>.md`
+## Repository layout
 
-The markdown report includes release gate verdict, severity/category breakdown, failed vectors,
-and traceability notes aligned with EU AI Act robustness expectations.
-
-## Repository structure
-
-```
+```text
 sft-wagmi/
-├── data/
-│   ├── train.jsonl                  # SFT training rows (JSONL chat format)
-│   ├── eval.jsonl                   # Held-out eval rows
-│   ├── tooling_email_calendar.jsonl # Auth-profile tool-calling examples
-│   ├── metadata.json                # Counts + distribution + version
-│   └── next/                        # Staging area for next-version entries
-├── scripts/
-│   ├── pipeline.py                  # CLI orchestration (--all, --train, --export-merged ...)
-│   ├── merge_next.py                # Merge data/next/ into train/eval + bump VERSION
-│   ├── export_ollama.py             # Standalone merge + GGUF + Ollama import
-│   └── local_gguf_export.sh         # Local Mac GGUF conversion + quantization
-├── baseline.py                      # Baseline eval (pre-SFT)
-├── train.py                         # Unsloth SFT
-├── autotune.py                      # GPT-4o judge-correct-retrain loop
-├── eval_sft.py                      # Post-training eval
-├── eval_sft_rag.py                  # Eval with RAG context
-├── eval_tool_calls.py               # Tool-calling eval (auth profile)
-├── eval_redteam.py                  # Adversarial guardrail eval + versioned report
-├── export_gguf.py                   # All-in-one GGUF export on Space (optional)
-├── export_merged.py                 # LoRA merge + push merged model (default)
-├── retrain_step.py                  # Helper for autotune merge/retrain
-├── prompt_encode.py                 # Chat template utilities for baseline
-├── app.py                           # Gradio Space entry
-├── Dockerfile                       # CUDA + deps image for HF Spaces
-├── docker-entrypoint.sh             # Container init (HOME, cache dirs)
-├── requirements.txt
-├── VERSION                          # Semver (see file; bump on pipeline-visible releases)
-├── CHANGELOG.md                     # Version history
-├── reports/redteam/                 # Version-linked red-team reports (AI Act traceability)
-└── README.md
+├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
+├── docs/                 HF model-card runbook (AI Act)
+├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
+│                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
+├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py
+├── Dockerfile, docker-entrypoint.sh, requirements.txt, VERSION, CHANGELOG.md
+└── reports/redteam/
 ```
 
-## Attribution
+## Attribution and licensing
 
-| Component | License | Link |
+Upstream licenses differ. **LFM** checkpoints (including `unsloth/` mirrors) are under **[LFM Open License v1.0](https://liquid.ai/lfm-license)** (Liquid AI; not interchangeable with Apache 2.0). **Qwen** bases used here are **Apache 2.0**. Read the license text and each Hub repo’s `LICENSE` before redistribution of weights, merges, or GGUF. Derivatives you train are still subject to the base model license. This section is informational, not legal advice.
+
+| Component | License | References |
 | --- | --- | --- |
-| Qwen2.5-1.5B-Instruct | Apache 2.0 | [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) |
-| Qwen2.5-14B-Instruct | Apache 2.0 | [Qwen/Qwen2.5-14B-Instruct](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct) |
-| LFM2.5-1.2B-Instruct | LFM Open License v1.0 | [unsloth/LFM2.5-1.2B-Instruct](https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct) |
-| LFM2-8B-A1B | LFM Open License v1.0 | [unsloth/LFM2-8B-A1B](https://huggingface.co/unsloth/LFM2-8B-A1B) |
-| Unsloth | Apache 2.0 | [unslothai/unsloth](https://github.com/unslothai/unsloth) |
-| TRL | Apache 2.0 | [huggingface/trl](https://github.com/huggingface/trl) |
-| llama.cpp | MIT | [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) |
-| Ollama | MIT | [ollama/ollama](https://github.com/ollama/ollama) |
-| GPT-4o (judge) | Proprietary | [OpenAI](https://openai.com) |
+| Qwen2.5-1.5B / 14B-Instruct | Apache 2.0 | [1.5B](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct), [14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct) |
+| LFM2.5-1.2B (incl. `unsloth/` mirror) | LFM Open License v1.0 | [Terms](https://liquid.ai/lfm-license); [unsloth](https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct), [LiquidAI](https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct) |
+| LFM2-8B-A1B (incl. `unsloth/` mirror) | LFM Open License v1.0 | [Terms](https://liquid.ai/lfm-license); [unsloth](https://huggingface.co/unsloth/LFM2-8B-A1B), [LiquidAI](https://huggingface.co/LiquidAI/LFM2-8B-A1B) |
+| Unsloth, TRL | Apache 2.0 | GitHub repos linked above |
+| llama.cpp, Ollama | MIT | Project repos |
+| GPT-4o (autotune) | Proprietary | OpenAI |
 
-The LoRA adapter and SFT dataset are original work by [Deal ex Machina](https://dealexmachina.com). Base model weights remain the property of their respective publishers (Qwen team / Liquid AI).
+Dataset, adapters, and merge artifacts: Deal ex Machina; distribution rules follow the base license and your Hub terms of use.
 
-## EU AI Act compliance
+## Compliance (summary)
 
-Wagmi is a **limited-risk AI system** under the [EU AI Act](https://artificialintelligenceact.eu/)
-(Regulation 2024/1689). It is a customer-facing chatbot embedded in a commercial website, which
-places it in the transparency-obligation tier (Article 50). It is not a high-risk system: it does
-not make decisions affecting health, safety, employment, creditworthiness, or law enforcement.
+Wagmi in production is a limited-scope chatbot (EU AI Act transparency tier; not high-risk as deployed). Internal practices include versioned training, red-team reports, no user chats in SFT data, RAG + SFT + optional autotune for quality. **Gaps:** no standalone formal risk register; release-time testing only; finite red-team vectors; incomplete public model cards; inference subprocessors and geography not fully contractually closed (see deployment docs on dexm / Koyeb).
 
-### What we do today
+AI Act model-card preparation workflow: [`docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md`](docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md) and `python3 scripts/prepare_hf_model_cards_ai_act.py`.
 
-| Principle | Implementation |
-| --- | --- |
-| **Transparency** | The chat widget explicitly identifies itself as an AI assistant ("I am Wagmi, the AI assistant for Deal ex Machina"). Every response carries this persona framing. The site footer links to the AI disclosure page (`/ai.txt`). |
-| **Human oversight** | Wagmi operates in an advisory capacity only. It cannot trigger transactions, modify user data, or access backend systems without human-in-the-loop approval. Tool-calling (email, calendar) in the auth profile requires authenticated operator context. |
-| **Robustness & security** | v0.2.0 adds 121 adversarial training entries covering OWASP LLM Top 10 categories. A 28-vector security smoke test runs at each release. The auth model (14B) achieved 0 FAIL / 0 WARN on the full suite. Prompt injection, social engineering, encoding obfuscation, and multi-turn deception vectors are explicitly trained against. |
-| **Data governance** | Training data is sourced exclusively from Deal ex Machina's own content (blog, site pages, Obsidian notes) and hand-crafted synthetic examples. No user conversations are used for training. Dataset provenance is tracked in `data/metadata.json` with per-entry `source` and `id` fields. |
-| **Accuracy & hallucination control** | Three-layer defence: RAG injects verified facts at inference time, SFT teaches uncertainty phrasing ("I don't have that information"), and the autotune loop penalises hallucination via GPT-4o scoring. |
-| **Versioning & traceability** | Every model version is semantically versioned (`VERSION`), logged in `CHANGELOG.md`, and tagged in Hub commit messages. Training artifacts (adapters, merged models, GGUF) are stored on Hugging Face Hub with version-stamped commits. |
-| **Bias mitigation** | Bilingual (FR/EN) dataset with balanced coverage. Guardrail entries explicitly train refusal of discriminatory, violent, or illegal content in both languages. |
-
-### Honest gaps
-
-- **No formal risk assessment document.** The AI Act will require a structured impact assessment
-  for transparency-tier systems by 2027. We have smoke tests and changelogs, but no standalone
-  risk register.
-- **No automated monitoring in production.** We test at release time, not continuously. A
-  production logging + flagging pipeline (e.g. Langfuse traces with anomaly detection) is needed.
-- **Adversarial coverage is finite.** 28 attack vectors is a strong start, but new jailbreak
-  techniques emerge regularly. The test suite must grow with each release.
-- **No external audit.** All testing is internal. Third-party red-teaming would strengthen
-  confidence in robustness claims.
-- **Model card is incomplete.** Hugging Face model cards for the adapter and GGUF repos should
-  document intended use, limitations, and evaluation results per the AI Act transparency
-  requirements.
-
-### Improvement path
-
-1. Publish a formal **model card** on each Hugging Face repo (adapter, merged, GGUF) with
-   intended use, limitations, evaluation metrics, and training data summary.
-2. Add **production observability** (Langfuse or equivalent) to log inference traces, flag
-   anomalous responses, and feed findings back into the training pipeline.
-3. Maintain a **risk register** that maps each identified threat to its mitigation and test
-   coverage.
-4. Schedule periodic **external red-teaming** sessions, at minimum before major version bumps.
-5. Expand the security smoke test to **50+ vectors** covering emerging attack patterns.
-
-## GDPR compliance
-
-Wagmi processes user messages at inference time to generate responses. This section documents
-how the system relates to the [General Data Protection Regulation](https://gdpr.eu/)
-(Regulation 2016/679), with an honest assessment of current state and gaps.
-
-### What we do today
-
-| Principle | Implementation |
-| --- | --- |
-| **Lawful basis** | The chat widget operates under **legitimate interest** (Art. 6(1)(f)): visitors initiate conversations voluntarily, and the assistant provides information about Deal ex Machina's services. No account creation or personal data collection is required to use the chat. |
-| **Data minimisation** | Wagmi does not store conversation history server-side beyond the active session. Messages are held in browser memory and sent to the inference endpoint (Koyeb Ollama) per request. No conversation logs are persisted to disk or database in production. |
-| **No training on user data** | The SFT dataset is composed exclusively of company-owned content and hand-crafted synthetic examples. User conversations are never fed back into training. This is a hard architectural boundary, not a policy toggle. |
-| **No profiling** | Wagmi does not build user profiles, track users across sessions, or make automated decisions with legal or significant effects. |
-| **Transparency** | The AI disclosure page (`/ai.txt`) and chat widget identify the system as AI-powered. Users know they are interacting with an automated system, not a human. |
-| **Sub-processors** | Inference runs on [Koyeb](https://koyeb.com) (EU-available infrastructure). The autotune judge uses OpenAI GPT-4o (US-based), but only on synthetic eval data, never on user content. Hugging Face Hub stores model weights, not user data. |
-
-### Honest gaps
-
-- **No Data Protection Impact Assessment (DPIA).** While Wagmi is unlikely to trigger the DPIA
-  threshold (no large-scale processing of personal data, no systematic monitoring), a lightweight
-  DPIA would formalise the analysis and satisfy accountability obligations under Art. 35.
-- **Inference endpoint logging is opaque.** Koyeb may retain request logs containing user messages
-  at the infrastructure level. We have not audited Koyeb's data retention policy for GPU inference
-  endpoints, nor established a Data Processing Agreement (DPA) specific to this workload.
-- **No explicit consent mechanism.** The chat widget does not present a GDPR consent banner before
-  the first message. While legitimate interest may suffice for a voluntary informational chatbot,
-  a clear notice ("Your messages are processed by AI and not stored") would strengthen compliance.
-- **No data subject rights workflow.** There is no self-service mechanism for users to request
-  access to, correction of, or deletion of their chat data. Since we do not persist conversations,
-  this is technically moot -- but the absence of documentation explaining this creates a
-  transparency gap.
-- **Cross-border data flows.** If Koyeb routes inference to non-EU nodes, user messages would
-  transit outside the EEA. We have not verified the geographic pinning of our GPU instance or
-  established Standard Contractual Clauses (SCCs) for this path.
-- **Autotune sub-processor.** The GPT-4o judge processes synthetic data only, but the OpenAI API
-  call path exists in production code. A misconfiguration could theoretically route user content
-  to OpenAI. There is no runtime guardrail preventing this beyond code review.
-
-### Improvement path
-
-1. **Audit Koyeb's DPA** and verify that the GPU inference endpoint runs in an EU region.
-   Establish SCCs or adequacy-basis documentation if it does not.
-2. **Add a pre-chat notice** to the widget: "This is an AI assistant. Your messages are processed
-   to generate responses and are not stored or used for training."
-3. **Write a lightweight DPIA** covering the inference data flow (browser -> Koyeb -> Ollama ->
-   response), even if the conclusion is that no high risk is identified.
-4. **Document the "no persistence" architecture** in a public privacy notice, so data subjects
-   understand that no conversation data is retained and therefore access/deletion requests are
-   satisfied by design.
-5. **Add a runtime assertion** in the inference path that prevents user-supplied content from
-   being forwarded to external APIs (OpenAI, Anthropic) outside of explicitly operator-triggered
-   autotune sessions.
-6. **Review the cookie/local-storage footprint** of the chat widget to confirm it does not
-   create persistent identifiers that would require ePrivacy consent.
+**GDPR (summary):** chat is positioned as voluntary information; no training on user messages; limited persistence by product design. **Gaps:** no published DPIA; infrastructure logging and DPA coverage for inference hosts not fully documented; autotune code path must stay isolated from live user traffic.
 
 ## Related
 
-- [dexm-one-page](https://github.com/DealExMachina/dexm-one-page) -- production site and `scripts/generate-wagmi-sft-dataset.ts`
-- [Dresser un petit modele sur CPU](https://dealexmachina.com/fr/blog/dresser-petit-modele-cpu) -- long-form write-up (FR)
-- [SFT Wagmi, pipeline rudimentaire](https://dealexmachina.com/fr/blog/2026-04-06-sft-wagmi-rudimentary-pipeline-fr) -- pipeline notes (FR)
-
----
-
-<sub>Built with [Cursor](https://cursor.com) by [Deal ex Machina](https://dealexmachina.com) -- *The optimal path between vision and results.*</sub>
+- [dexm-one-page](https://github.com/DealExMachina/dexm-one-page) (site, `scripts/generate-wagmi-sft-dataset.ts`)
+- [FR: Dresser un petit modèle sur CPU](https://dealexmachina.com/fr/blog/dresser-petit-modele-cpu)
+- [FR: Pipeline SFT](https://dealexmachina.com/fr/blog/2026-04-06-sft-wagmi-rudimentary-pipeline-fr)

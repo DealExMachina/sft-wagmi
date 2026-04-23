@@ -25,6 +25,7 @@ Runtime environment overrides (highest priority, applied on top of registry defa
     SMALL_PER_DEVICE_BATCH / AUTH_PER_DEVICE_BATCH
     SMALL_GRAD_ACCUM / AUTH_GRAD_ACCUM
     SMALL_DATASET_NUM_PROC / AUTH_DATASET_NUM_PROC
+    SMALL_TOP_P / AUTH_TOP_P, SMALL_TOP_K / AUTH_TOP_K — used when LLM_FAMILY=lfm2 (sampling defaults)
 """
 
 from __future__ import annotations
@@ -289,6 +290,48 @@ def resolve_profile_config(
         grad_accum=_i("GRAD_ACCUM", "grad_accum"),
         dataset_num_proc=_i("DATASET_NUM_PROC", "dataset_num_proc"),
     )
+
+
+def resolve_generation_kwargs(
+    profile: str | None = None,
+    family: str | None = None,
+) -> dict[str, float | int | bool]:
+    """Keyword arguments for ``model.generate()`` (autotune, eval_*, baseline).
+
+    **Qwen / qwen3:** greedy by default (``temperature=0``, ``do_sample=False``),
+    matching prior autotune behaviour.
+
+    **lfm2:** defaults aligned with Liquid's LFM2.5 Instruct card (low temperature,
+    ``top_p``, ``top_k``, ``repetition_penalty``) so scripted eval is not judged
+    under Qwen-optimal decoding. Override with the usual ``SMALL_*`` / ``AUTH_*``
+    env vars; set ``SMALL_TEMPERATURE=0`` for greedy LFM2 runs.
+    """
+    f = family if family is not None else resolve_family()
+    p = profile if profile is not None else resolve_profile()
+    prefix = "SMALL_" if p == "small" else "AUTH_"
+    max_new = int(os.environ.get(f"{prefix}MAX_NEW_TOKENS", "220"))
+    rep = float(os.environ.get(f"{prefix}REPETITION_PENALTY", "1.05"))
+
+    if f == "lfm2":
+        temp = float(os.environ.get(f"{prefix}TEMPERATURE", "0.1"))
+        top_p = float(os.environ.get(f"{prefix}TOP_P", "0.1"))
+        top_k = int(os.environ.get(f"{prefix}TOP_K", "50"))
+        return {
+            "max_new_tokens": max_new,
+            "temperature": temp,
+            "top_p": top_p,
+            "top_k": top_k,
+            "do_sample": temp > 0.0,
+            "repetition_penalty": rep,
+        }
+
+    temp = float(os.environ.get(f"{prefix}TEMPERATURE", "0.0"))
+    return {
+        "max_new_tokens": max_new,
+        "temperature": temp,
+        "do_sample": False,
+        "repetition_penalty": rep,
+    }
 
 
 def print_device_info() -> None:

@@ -34,7 +34,13 @@ warnings.filterwarnings(
 )
 
 # ── Config ────────────────────────────────────────────────────────────────────
-from config import read_package_version, resolve_family, resolve_profile, resolve_profile_config
+from config import (
+    read_package_version,
+    resolve_family,
+    resolve_generation_kwargs,
+    resolve_profile,
+    resolve_profile_config,
+)
 
 LLM_FAMILY = resolve_family()
 MODEL_PROFILE = resolve_profile()
@@ -46,21 +52,7 @@ ADAPTER_DIR = cfg.adapter_dir
 MAX_SEQ_LEN = cfg.max_seq_len
 DTYPE = torch.bfloat16
 
-PROFILE_GEN_KWARGS = {
-    "small": dict(
-        max_new_tokens=int(os.environ.get("SMALL_MAX_NEW_TOKENS", "220")),
-        temperature=float(os.environ.get("SMALL_TEMPERATURE", "0.0")),
-        do_sample=False,
-        repetition_penalty=float(os.environ.get("SMALL_REPETITION_PENALTY", "1.05")),
-    ),
-    "auth": dict(
-        max_new_tokens=int(os.environ.get("AUTH_MAX_NEW_TOKENS", "220")),
-        temperature=float(os.environ.get("AUTH_TEMPERATURE", "0.0")),
-        do_sample=False,
-        repetition_penalty=float(os.environ.get("AUTH_REPETITION_PENALTY", "1.05")),
-    ),
-}
-GEN_KWARGS = PROFILE_GEN_KWARGS[MODEL_PROFILE]
+GEN_KWARGS = resolve_generation_kwargs(MODEL_PROFILE, LLM_FAMILY)
 
 JUDGE_MODEL = "gpt-4o"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
