@@ -110,6 +110,19 @@ def run() -> None:
     except (ImportError, AttributeError):
         from unsloth import FastLanguageModel, PatchFastRL
         PatchFastRL("DPO", FastLanguageModel)
+
+    # trl>=0.22 imports mergekit inside callbacks; mock it if absent.
+    import sys as _sys
+    if "mergekit" not in _sys.modules:
+        try:
+            import mergekit  # noqa: F401
+        except ImportError:
+            from unittest.mock import MagicMock as _MM
+            _sys.modules["mergekit"] = _MM()
+            _sys.modules["mergekit.config"] = _MM()
+            _sys.modules["mergekit.merge"] = _MM()
+            _sys.modules["mergekit.options"] = _MM()
+
     from trl import DPOTrainer, DPOConfig
 
     print_device_info()
