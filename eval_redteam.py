@@ -31,6 +31,7 @@ from config import (
     resolve_profile,
     resolve_profile_config,
 )
+from eval_openai_compat import OpenAICompatClient
 
 LLM_FAMILY = resolve_family()
 MODEL_PROFILE = resolve_profile()
@@ -293,36 +294,41 @@ def run() -> dict:
     version = get_version()
     print(f"Version: {version}")
     print(f"Profile: {MODEL_PROFILE}")
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    api_client = OpenAICompatClient.from_env()
+    if api_client:
+        print(f"Remote eval API mode: {api_client.base_url} model={api_client.model}")
+    else:
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
 
     cases = json.loads(CASES_FILE.read_text(encoding="utf-8"))
     adapter_path = ADAPTER_DIR if Path(ADAPTER_DIR).exists() else HUB_ADAPTER
-    print(f"Loading base model: {BASE_MODEL_ID}")
-    print(f"Loading adapter: {adapter_path}")
+    if not api_client:
+        print(f"Loading base model: {BASE_MODEL_ID}")
+        print(f"Loading adapter: {adapter_path}")
 
-    if MODEL_PROFILE == "auth":
-        from unsloth import FastLanguageModel
+        if MODEL_PROFILE == "auth":
+            from unsloth import FastLanguageModel
 
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=adapter_path,
-            max_seq_length=2048,
-            dtype=DTYPE,
-            load_in_4bit=True,
-        )
-        FastLanguageModel.for_inference(model)
-    else:
-        from peft import PeftModel
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+            model, tokenizer = FastLanguageModel.from_pretrained(
+                model_name=adapter_path,
+                max_seq_length=2048,
+                dtype=DTYPE,
+                load_in_4bit=True,
+            )
+            FastLanguageModel.for_inference(model)
+        else:
+            from peft import PeftModel
+            from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        tokenizer = AutoTokenizer.from_pretrained(adapter_path)
-        base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL_ID, dtype=DTYPE, device_map="auto")
-        model = PeftModel.from_pretrained(base_model, adapter_path)
-        model.eval()
+            tokenizer = AutoTokenizer.from_pretrained(adapter_path)
+            base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL_ID, dtype=DTYPE, device_map="auto")
+            model = PeftModel.from_pretrained(base_model, adapter_path)
+            model.eval()
 
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    if getattr(model, "generation_config", None) is not None:
-        model.generation_config.max_length = None
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        if getattr(model, "generation_config", None) is not None:
+            model.generation_config.max_length = None
 
     results = []
     for i, case in enumerate(cases, 1):
@@ -331,11 +337,14 @@ def run() -> dict:
             {"role": "system", "content": strict_system_prompt(case["locale"])},
             {"role": "user", "content": case["prompt"]},
         ]
-        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
-        with torch.no_grad():
-            out = model.generate(**inputs, **GEN_KWARGS)
-        response = tokenizer.decode(out[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=True).strip()
+        if api_client:
+            response = api_client.chat_completion(messages, GEN_KWARGS)
+        else:
+            text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
+            with torch.no_grad():
+                out = model.generate(**inputs, **GEN_KWARGS)
+            response = tokenizer.decode(out[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=True).strip()
         evaluation = check_case(case, response)
         results.append(
             {
@@ -391,8 +400,8 @@ def run() -> dict:
     payload = {
         "version": version,
         "profile": MODEL_PROFILE,
-        "model": BASE_MODEL_ID,
-        "adapter": str(adapter_path),
+        "model": api_client.model if api_client else BASE_MODEL_ID,
+        "adapter": "remote-openai-compatible" if api_client else str(adapter_path),
         "evaluatedAt": evaluated_at,
         "casesFile": str(CASES_FILE.relative_to(ROOT)),
         "genKwargs": GEN_KWARGS,

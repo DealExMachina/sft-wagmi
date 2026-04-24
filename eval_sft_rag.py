@@ -23,6 +23,7 @@ from config import (
     resolve_profile,
     resolve_profile_config,
 )
+from eval_openai_compat import OpenAICompatClient
 
 LLM_FAMILY = resolve_family()
 MODEL_PROFILE = resolve_profile()
@@ -167,38 +168,43 @@ PROMPTS = [
 
 
 def run():
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"Model family: {LLM_FAMILY}")
+    api_client = OpenAICompatClient.from_env()
+    if api_client:
+        print(f"Remote eval API mode: {api_client.base_url} model={api_client.model}")
+    else:
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
 
     adapter_path = ADAPTER_DIR if Path(ADAPTER_DIR).exists() else HUB_ADAPTER
-    print(f"\nLoading base model: {BASE_MODEL_ID}")
-    print(f"Loading adapter: {adapter_path} (profile={MODEL_PROFILE})")
+    if not api_client:
+        print(f"\nLoading base model: {BASE_MODEL_ID}")
+        print(f"Loading adapter: {adapter_path} (profile={MODEL_PROFILE})")
 
-    if MODEL_PROFILE == "auth":
-        from unsloth import FastLanguageModel
+        if MODEL_PROFILE == "auth":
+            from unsloth import FastLanguageModel
 
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=adapter_path,
-            max_seq_length=2048,
-            dtype=DTYPE,
-            load_in_4bit=True,
-        )
-        FastLanguageModel.for_inference(model)
-    else:
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-        from peft import PeftModel
+            model, tokenizer = FastLanguageModel.from_pretrained(
+                model_name=adapter_path,
+                max_seq_length=2048,
+                dtype=DTYPE,
+                load_in_4bit=True,
+            )
+            FastLanguageModel.for_inference(model)
+        else:
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            from peft import PeftModel
 
-        tokenizer = AutoTokenizer.from_pretrained(adapter_path)
-        base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL_ID, dtype=DTYPE, device_map="auto")
-        model = PeftModel.from_pretrained(base_model, adapter_path)
-        model.eval()
+            tokenizer = AutoTokenizer.from_pretrained(adapter_path)
+            base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL_ID, dtype=DTYPE, device_map="auto")
+            model = PeftModel.from_pretrained(base_model, adapter_path)
+            model.eval()
 
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    if getattr(model, "generation_config", None) is not None:
-        model.generation_config.max_length = None
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        if getattr(model, "generation_config", None) is not None:
+            model.generation_config.max_length = None
 
-    print(f"Model loaded. Running with RAG context injection.\n")
+        print("Model loaded. Running with RAG context injection.\n")
 
     results = []
     for i, p in enumerate(PROMPTS, 1):
@@ -211,19 +217,22 @@ def run():
             {"role": "system", "content": system},
             {"role": "user", "content": p["user"]},
         ]
-        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
-        with torch.no_grad():
-            out = model.generate(**inputs, **GEN_KWARGS)
-        response = tokenizer.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
+        if api_client:
+            response = api_client.chat_completion(messages, GEN_KWARGS)
+        else:
+            text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
+            with torch.no_grad():
+                out = model.generate(**inputs, **GEN_KWARGS)
+            response = tokenizer.decode(out[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True).strip()
         results.append({**p, "has_rag": has_rag, "response": response})
         print("done")
 
     # Save
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "model": BASE_MODEL_ID,
-        "adapter": adapter_path,
+        "model": api_client.model if api_client else BASE_MODEL_ID,
+        "adapter": "remote-openai-compatible" if api_client else adapter_path,
         "stage": "sft+rag",
         "evaluatedAt": datetime.datetime.utcnow().isoformat() + "Z",
         "genKwargs": GEN_KWARGS,
