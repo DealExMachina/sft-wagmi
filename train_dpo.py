@@ -103,8 +103,13 @@ def run() -> None:
         raise SystemExit(2)
 
     # ── Patch DPO before importing TRL ────────────────────────────────────────
-    from unsloth import FastLanguageModel, PatchDPOTrainer
-    PatchDPOTrainer()
+    # Unsloth API varies by version; try both known variants.
+    try:
+        from unsloth import FastLanguageModel, PatchDPOTrainer
+        PatchDPOTrainer()
+    except (ImportError, AttributeError):
+        from unsloth import FastLanguageModel, PatchFastRL
+        PatchFastRL("DPO", FastLanguageModel)
     from trl import DPOTrainer, DPOConfig
 
     print_device_info()
