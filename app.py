@@ -45,13 +45,27 @@ def gpu_info():
 
 
 def run_script(script: str, profile: str = "small", family: str = "qwen"):
+    extra_env = {}
+    if profile == "auth" and family == "qwen":
+        # Keep 14B auth runs stable on L40 (44GB) in Spaces.
+        extra_env["AUTH_MAX_SEQ_LEN"] = os.environ.get("AUTH_MAX_SEQ_LEN", "1024")
+        extra_env["PYTORCH_CUDA_ALLOC_CONF"] = os.environ.get(
+            "PYTORCH_CUDA_ALLOC_CONF",
+            "expandable_segments:True",
+        )
     proc = subprocess.Popen(
         [sys.executable, "-u", script],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
-        env={**os.environ, "PYTHONUNBUFFERED": "1", "MODEL_PROFILE": profile, "LLM_FAMILY": family},
+        env={
+            **os.environ,
+            **extra_env,
+            "PYTHONUNBUFFERED": "1",
+            "MODEL_PROFILE": profile,
+            "LLM_FAMILY": family,
+        },
     )
     output = ""
     for line in iter(proc.stdout.readline, ""):
@@ -71,6 +85,14 @@ def run_baseline(profile: str, family: str):
 
 def run_training(profile: str, family: str):
     yield from run_script("train.py", profile, family)
+
+
+def run_dpo_training(profile: str, family: str):
+    yield from run_script("train_dpo.py", profile, family)
+
+
+def run_grpo_training(profile: str, family: str):
+    yield from run_script("train_grpo.py", profile, family)
 
 
 def run_eval_sft(profile: str, family: str):
@@ -119,13 +141,26 @@ def run_merge_next():
 
 
 def run_full_pipeline(profile: str, family: str):
+    extra_env = {}
+    if profile == "auth" and family == "qwen":
+        extra_env["AUTH_MAX_SEQ_LEN"] = os.environ.get("AUTH_MAX_SEQ_LEN", "1024")
+        extra_env["PYTORCH_CUDA_ALLOC_CONF"] = os.environ.get(
+            "PYTORCH_CUDA_ALLOC_CONF",
+            "expandable_segments:True",
+        )
     proc = subprocess.Popen(
         [sys.executable, "-u", "scripts/pipeline.py", "--all", "--profile", profile, "--family", family],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
-        env={**os.environ, "PYTHONUNBUFFERED": "1", "LLM_FAMILY": family, "MODEL_PROFILE": profile},
+        env={
+            **os.environ,
+            **extra_env,
+            "PYTHONUNBUFFERED": "1",
+            "LLM_FAMILY": family,
+            "MODEL_PROFILE": profile,
+        },
     )
     output = ""
     for line in iter(proc.stdout.readline, ""):
@@ -254,15 +289,35 @@ with gr.Blocks(title="sft-wagmi") as demo:
         baseline_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
         baseline_btn.click(fn=run_baseline, inputs=[profile, family], outputs=baseline_out)
 
-    with gr.Tab("2. Train"):
+    with gr.Tab("2. Train (SFT)"):
         gr.Markdown(
             "Fine-tune with LoRA/QLoRA on the Wagmi dataset. "
             "Model family and profile are selected above. "
             "small = anon-tier base model, auth = tool-capable authenticated-tier model."
         )
-        train_btn = gr.Button("Run training", variant="primary")
+        train_btn = gr.Button("Run SFT training", variant="primary")
         train_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
         train_btn.click(fn=run_training, inputs=[profile, family], outputs=train_out)
+
+    with gr.Tab("2b. Train (DPO)"):
+        gr.Markdown(
+            "**DPO safety alignment** — starts from the last SFT adapter and trains on "
+            "`data/dpo/wagmi_safety_dpo.jsonl` (81 chosen/rejected pairs). "
+            "Use after SFT when `must_refuse` gate fails. ~25 min on L40."
+        )
+        dpo_btn = gr.Button("Run DPO training", variant="primary")
+        dpo_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
+        dpo_btn.click(fn=run_dpo_training, inputs=[profile, family], outputs=dpo_out)
+
+    with gr.Tab("2c. Train (GRPO)"):
+        gr.Markdown(
+            "**GRPO safety alignment** — Phase 2 fallback if DPO is insufficient. "
+            "Starts from the DPO checkpoint. Uses a binary reward function that rewards "
+            "explicit refusals on attacks. ~90 min on L40."
+        )
+        grpo_btn = gr.Button("Run GRPO training", variant="primary")
+        grpo_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
+        grpo_btn.click(fn=run_grpo_training, inputs=[profile, family], outputs=grpo_out)
 
     with gr.Tab("3. Eval SFT"):
         gr.Markdown("Run fine-tuned model on same prompts and compare with baseline.")
