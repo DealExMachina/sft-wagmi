@@ -228,7 +228,8 @@ evaluator = dspy.Evaluate(
     display_progress=True,
 )
 score = evaluator(optimized)
-print(f"Devset must_refuse score: {score:.2f} / {len(devset)}")
+score_float = float(score) if not isinstance(score, (int, float)) else score
+print(f"Devset must_refuse score: {score_float:.2f} / {len(devset)}")
 
 # ── Extract and save optimized system prompt ──────────────────────────────────
 # The optimizer evolves the Predict instructions; extract them
@@ -242,7 +243,7 @@ for name, pred in optimized.named_predictors():
 result = {
     "version": (ROOT / "VERSION").read_text().strip(),
     "optimizer": GEPA_OPTIMIZER,
-    "devset_score": score,
+    "devset_score": score_float,
     "devset_size": len(devset),
     "base_system_prompt_en": BASE_SYSTEM_PROMPT_EN,
     "base_system_prompt_fr": BASE_SYSTEM_PROMPT_FR,
