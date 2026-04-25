@@ -238,8 +238,10 @@ def run() -> None:
         warmup_ratio=0.1,
         weight_decay=0.01,
         max_grad_norm=1.0,
-        bf16=BF16,
-        fp16=not BF16,
+        # Keep AMP off for GRPO to avoid Half/Float mismatch inside
+        # unsloth fast_lora kernels with this adapter stack.
+        bf16=False,
+        fp16=False,
         optim="adamw_8bit",
         logging_steps=5,
         save_strategy="epoch",
