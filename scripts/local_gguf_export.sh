@@ -9,8 +9,9 @@
 #       numpy sentencepiece protobuf transformers torch huggingface_hub
 #
 # Usage:
-#   ./scripts/local_gguf_export.sh auth      # 14B model
-#   ./scripts/local_gguf_export.sh small     # 1.5B model
+#   ./scripts/local_gguf_export.sh auth      # 14B SFT merged
+#   ./scripts/local_gguf_export.sh auth-dpo # 14B DPO merged (after Space export tab 7c)
+#   ./scripts/local_gguf_export.sh small   # 1.5B model
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -34,8 +35,14 @@ case "$PROFILE" in
     ARTIFACT="wagmi-qwen2.5-14b-sft"
     DEFAULT_OLLAMA="wagmi-sft-14b"
     ;;
+  auth-dpo)
+    HUB_MERGED="jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo-merged"
+    HUB_GGUF="jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo-gguf"
+    ARTIFACT="wagmi-qwen2.5-14b-sft-dpo"
+    DEFAULT_OLLAMA="wagmi-sft-14b-dpo"
+    ;;
   *)
-    echo "Usage: $0 [small|auth]" >&2
+    echo "Usage: $0 [small|auth|auth-dpo]" >&2
     exit 1
     ;;
 esac

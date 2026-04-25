@@ -107,12 +107,50 @@ def run_eval_tools(profile: str, family: str):
     yield from run_script("eval_tool_calls.py", profile, family)
 
 
+def run_eval_redteam(profile: str, family: str):
+    yield from run_script("eval_redteam.py", profile, family)
+
+
 def run_autotune(profile: str, family: str):
     yield from run_script("autotune.py", profile, family)
 
 
 def run_export_merged(profile: str, family: str):
     yield from run_script("export_merged.py", profile, family)
+
+
+def run_export_dpo_merged(profile: str, family: str):
+    """Export merged model using DPO adapter instead of SFT adapter."""
+    extra_env = {
+        "AUTH_HUB_MODEL_ID": "jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo",
+        "AUTH_HUB_MERGED_REPO": "jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo-merged",
+    }
+    if profile == "auth" and family == "qwen":
+        extra_env["AUTH_MAX_SEQ_LEN"] = os.environ.get("AUTH_MAX_SEQ_LEN", "1024")
+        extra_env["PYTORCH_CUDA_ALLOC_CONF"] = os.environ.get(
+            "PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True"
+        )
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "export_merged.py"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        env={
+            **os.environ,
+            **extra_env,
+            "PYTHONUNBUFFERED": "1",
+            "MODEL_PROFILE": profile,
+            "LLM_FAMILY": family,
+        },
+    )
+    output = ""
+    for line in iter(proc.stdout.readline, ""):
+        output += line
+        yield output
+    proc.wait()
+    output += f"\n\nProcess exited with code {proc.returncode}" if proc.returncode != 0 else "\n\nDone."
+    yield output
 
 
 def run_export_gguf(profile: str, family: str):
@@ -340,6 +378,15 @@ with gr.Blocks(title="sft-wagmi") as demo:
         eval_tools_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
         eval_tools_btn.click(fn=run_eval_tools, inputs=[profile, family], outputs=eval_tools_out)
 
+    with gr.Tab("5b. Eval Red Team"):
+        gr.Markdown(
+            "**Guardrail / red-team gate** — runs `eval_redteam.py` (must_refuse, URLs, emails). "
+            "Set `EVAL_API_*` in Space secrets to evaluate a remote Koyeb endpoint; otherwise loads the local adapter."
+        )
+        eval_red_btn = gr.Button("Run red-team eval", variant="primary")
+        eval_red_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
+        eval_red_btn.click(fn=run_eval_redteam, inputs=[profile, family], outputs=eval_red_out)
+
     with gr.Tab("6. Autotune"):
         gr.Markdown(
             "**Karpathy-style self-improvement loop (small + auth).** GPT-4o scores each response (6 criteria), "
@@ -350,15 +397,25 @@ with gr.Blocks(title="sft-wagmi") as demo:
         autotune_out = gr.Textbox(label="Output", lines=40, max_lines=120, autoscroll=True)
         autotune_btn.click(fn=run_autotune, inputs=[profile, family], outputs=autotune_out)
 
-    with gr.Tab("7. Export Merged"):
+    with gr.Tab("7. Export Merged (SFT)"):
         gr.Markdown(
-            "**Merge LoRA + push to Hub.** Merges the adapter into the base model "
+            "**Merge SFT LoRA + push to Hub.** Merges the SFT adapter into the base model "
             "and uploads merged safetensors to HuggingFace Hub. "
             "GGUF conversion runs locally on your Mac via `scripts/local_gguf_export.sh`."
         )
-        export_merged_btn = gr.Button("Export Merged Model", variant="primary")
+        export_merged_btn = gr.Button("Export Merged Model (SFT)", variant="primary")
         export_merged_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
         export_merged_btn.click(fn=run_export_merged, inputs=[profile, family], outputs=export_merged_out)
+
+    with gr.Tab("7c. Export Merged (DPO)"):
+        gr.Markdown(
+            "**Merge DPO adapter + push to Hub.** Uses `jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo` "
+            "as the adapter source and pushes merged safetensors to `wagmi-qwen2.5-14b-sft-dpo-merged`. "
+            "Run this after DPO training. Then run `scripts/local_gguf_export.sh auth-dpo` locally."
+        )
+        export_dpo_btn = gr.Button("Export Merged Model (DPO)", variant="primary")
+        export_dpo_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
+        export_dpo_btn.click(fn=run_export_dpo_merged, inputs=[profile, family], outputs=export_dpo_out)
 
     with gr.Tab("7b. Export GGUF (legacy)"):
         gr.Markdown(

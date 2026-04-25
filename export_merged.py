@@ -29,7 +29,8 @@ HUB_MERGED_REPO = os.environ.get(
     "SMALL_HUB_MERGED_REPO" if MODEL_PROFILE == "small" else "AUTH_HUB_MERGED_REPO",
     cfg.hub_merged,
 )
-MAX_SEQ_LEN = 2048
+# Align with training (auth/qwen uses 1024 on L40 Spaces via AUTH_MAX_SEQ_LEN).
+MAX_SEQ_LEN = cfg.max_seq_len
 DTYPE = torch.bfloat16
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
