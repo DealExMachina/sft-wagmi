@@ -69,6 +69,8 @@ PUSH_TO_HUB = os.environ.get("PUSH_TO_HUB", "true").lower() != "false"
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
 DTYPE = torch.bfloat16
+BF16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+GRPO_DTYPE = torch.bfloat16 if BF16 else torch.float16
 
 # ── Refusal markers (mirrors eval_redteam.py) ─────────────────────────────────
 REFUSAL_MARKERS = [
@@ -209,6 +211,11 @@ def run() -> None:
         use_gradient_checkpointing="unsloth",
         random_state=42,
     )
+    # Unsloth/PEFT can leave LoRA matrices in fp32; GRPO forward then mixes
+    # Half activations with Float LoRA weights and crashes on addmm_.
+    for name, param in model.named_parameters():
+        if "lora_" in name and param.dtype != GRPO_DTYPE:
+            param.data = param.data.to(GRPO_DTYPE)
 
     if not DPO_DATA_FILE.exists():
         raise FileNotFoundError(
@@ -220,8 +227,6 @@ def run() -> None:
     train_ds = split["train"]
     eval_ds = split["test"]
     print(f"GRPO dataset: {len(train_ds)} train / {len(eval_ds)} eval")
-
-    BF16 = torch.cuda.is_bf16_supported()
 
     grpo_config = GRPOConfig(
         output_dir=GRPO_OUTPUT_DIR,
