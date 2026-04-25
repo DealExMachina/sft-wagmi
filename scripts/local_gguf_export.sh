@@ -5,7 +5,9 @@
 # Prereqs:
 #   brew install llama.cpp
 #   python3 -m venv .venv-gguf
-#   .venv-gguf/bin/pip install gguf@git+https://github.com/ggml-org/llama.cpp@b8680#subdirectory=gguf-py \
+#   Match gguf-py to your Homebrew llama.cpp commit (avoids MODEL_ARCH / convert script drift):
+#     BREW_REV=$(python3 -c "import json,glob; p=glob.glob('/opt/homebrew/Cellar/llama.cpp/*/INSTALL_RECEIPT.json')[0]; print(json.load(open(p))['source']['scm_revision'])")
+#     .venv-gguf/bin/pip install "gguf@git+https://github.com/ggml-org/llama.cpp@${BREW_REV}#subdirectory=gguf-py" \
 #       numpy sentencepiece protobuf transformers torch huggingface_hub
 #
 # Usage:

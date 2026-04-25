@@ -105,6 +105,11 @@ def run():
         traceback.print_exc()
         return
 
+    gguf_profile = (
+        "auth-dpo"
+        if MODEL_PROFILE == "auth" and "dpo" in HUB_MERGED_REPO.lower()
+        else MODEL_PROFILE
+    )
     print(f"""
 {'='*60}
   DONE — merged model on Hub
@@ -115,7 +120,7 @@ def run():
   Next step — run locally on your Mac:
 
     cd sft-wagmi
-    ./scripts/local_gguf_export.sh {MODEL_PROFILE}
+    ./scripts/local_gguf_export.sh {gguf_profile}
 
   This will download the merged model, convert to GGUF Q4_K_M,
   generate the Ollama Modelfile, and push the GGUF to Hub.

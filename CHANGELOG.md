@@ -4,6 +4,13 @@ Semver: `MAJOR.MINOR.PATCH`. **MAJOR:** persona / base model / schema break. **M
 
 ---
 
+## 0.3.5 -- 2026-04-25
+
+- **DPO safety path (14B / auth / qwen):** `train_dpo.py`, `data/dpo/wagmi_safety_dpo.jsonl`, Hub adapter `jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo`, merged `…-sft-dpo-merged`, GGUF `…-sft-dpo-gguf` (local export: `./scripts/local_gguf_export.sh auth-dpo`).
+- **Space:** Gradio tabs for DPO / GRPO training, **Export merged (DPO)** (tab 7c), **Eval red team** (tab 5b); `export_merged.py` uses `ProfileConfig.max_seq_len` for L40 stability.
+- **Local GGUF:** document pinning `gguf-py` to the same git SHA as Homebrew `llama.cpp` (avoids `HUNYUAN_VL` / `MODEL_ARCH` mismatch with `convert_hf_to_gguf.py`).
+- **GEPA / DSPy:** `scripts/dspy/gepa_system_prompt.py`, `data/optimized_system_prompt.json` (bootstrap run, devset metric).
+
 ## 0.3.4 -- 2026-04-18
 
 - `config.resolve_generation_kwargs()`: for `lfm2`, scripted `generate()` uses non-greedy defaults (`temperature`, `top_p`, `top_k`, `repetition_penalty`); `qwen` / `qwen3` stay greedy unless env overrides. Used from autotune, `eval_*`, `baseline.py`.
