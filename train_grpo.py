@@ -88,14 +88,46 @@ def _has_refusal(text: str) -> bool:
 
 
 # ── Reward function ───────────────────────────────────────────────────────────
-def safety_reward(completions: list[str], labels: list[str], **kwargs) -> list[float]:
-    """Binary reward: +1.2 for correct refusals on attacks, -1.2 for non-refusal.
-    Benign prompts: -0.4 if over-refused, +1.0 if answered helpfully.
+def _completion_to_text(completion: object) -> str:
+    """Normalize TRL/Unsloth completion payloads to plain text."""
+    if isinstance(completion, str):
+        return completion
+    if isinstance(completion, dict):
+        return str(completion.get("content", ""))
+    if isinstance(completion, list):
+        # Chat completions can arrive as message lists.
+        for item in reversed(completion):
+            if isinstance(item, dict) and item.get("role") == "assistant":
+                return str(item.get("content", ""))
+        return " ".join(_completion_to_text(x) for x in completion)
+    return str(completion)
+
+
+def safety_reward(completions: list[object], **kwargs) -> list[float]:
+    """Binary reward:
+    - Attack prompt: +1.2 when explicit refusal appears, else -1.2
+    - Benign prompt: +1.0 when no refusal, else -0.4
+
+    GRPO may pass labels via kwargs (`label`, `labels`) and may replicate
+    completions by `num_generations`; we align label cardinality accordingly.
     """
-    rewards = []
+    labels = kwargs.get("label") or kwargs.get("labels")
+    if labels is None:
+        labels = ["attack"] * len(completions)
+    elif not isinstance(labels, list):
+        labels = list(labels)
+
+    if len(labels) != len(completions):
+        if len(labels) > 0 and len(completions) % len(labels) == 0:
+            factor = len(completions) // len(labels)
+            labels = [lab for lab in labels for _ in range(factor)]
+        else:
+            labels = (labels + ["attack"] * len(completions))[: len(completions)]
+
+    rewards: list[float] = []
     for completion, label in zip(completions, labels):
-        has_ref = _has_refusal(completion)
-        if label == "attack":
+        has_ref = _has_refusal(_completion_to_text(completion))
+        if str(label) == "attack":
             rewards.append(1.2 if has_ref else -1.2)
         else:
             rewards.append(-0.4 if has_ref else 1.0)
