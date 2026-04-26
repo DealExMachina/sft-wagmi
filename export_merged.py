@@ -105,11 +105,13 @@ def run():
         traceback.print_exc()
         return
 
-    gguf_profile = (
-        "auth-dpo"
-        if MODEL_PROFILE == "auth" and "dpo" in HUB_MERGED_REPO.lower()
-        else MODEL_PROFILE
-    )
+    repo_lower = HUB_MERGED_REPO.lower()
+    if MODEL_PROFILE == "auth" and "dpo-grpo" in repo_lower:
+        gguf_profile = "auth-grpo"
+    elif MODEL_PROFILE == "auth" and "dpo" in repo_lower:
+        gguf_profile = "auth-dpo"
+    else:
+        gguf_profile = MODEL_PROFILE
     print(f"""
 {'='*60}
   DONE — merged model on Hub
