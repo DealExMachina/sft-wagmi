@@ -12,7 +12,8 @@
 #
 # Usage:
 #   ./scripts/local_gguf_export.sh auth      # 14B SFT merged
-#   ./scripts/local_gguf_export.sh auth-dpo # 14B DPO merged (after Space export tab 7c)
+#   ./scripts/local_gguf_export.sh auth-dpo  # 14B DPO merged (after Space export tab 7c)
+#   ./scripts/local_gguf_export.sh auth-grpo # 14B GRPO merged (after Space export tab 7d)
 #   ./scripts/local_gguf_export.sh small   # 1.5B model
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -43,8 +44,14 @@ case "$PROFILE" in
     ARTIFACT="wagmi-qwen2.5-14b-sft-dpo"
     DEFAULT_OLLAMA="wagmi-sft-14b-dpo"
     ;;
+  auth-grpo)
+    HUB_MERGED="jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo-grpo-merged"
+    HUB_GGUF="jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo-grpo-gguf"
+    ARTIFACT="wagmi-qwen2.5-14b-sft-dpo-grpo"
+    DEFAULT_OLLAMA="wagmi-sft-14b-grpo"
+    ;;
   *)
-    echo "Usage: $0 [small|auth|auth-dpo]" >&2
+    echo "Usage: $0 [small|auth|auth-dpo|auth-grpo]" >&2
     exit 1
     ;;
 esac

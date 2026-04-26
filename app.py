@@ -153,6 +153,40 @@ def run_export_dpo_merged(profile: str, family: str):
     yield output
 
 
+def run_export_grpo_merged(profile: str, family: str):
+    """Export merged model using GRPO adapter (DPO+GRPO checkpoint)."""
+    extra_env = {
+        "AUTH_HUB_MODEL_ID": "jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo-grpo",
+        "AUTH_HUB_MERGED_REPO": "jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo-grpo-merged",
+    }
+    if profile == "auth" and family == "qwen":
+        extra_env["AUTH_MAX_SEQ_LEN"] = os.environ.get("AUTH_MAX_SEQ_LEN", "1024")
+        extra_env["PYTORCH_CUDA_ALLOC_CONF"] = os.environ.get(
+            "PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True"
+        )
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "export_merged.py"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        env={
+            **os.environ,
+            **extra_env,
+            "PYTHONUNBUFFERED": "1",
+            "MODEL_PROFILE": profile,
+            "LLM_FAMILY": family,
+        },
+    )
+    output = ""
+    for line in iter(proc.stdout.readline, ""):
+        output += line
+        yield output
+    proc.wait()
+    output += f"\n\nProcess exited with code {proc.returncode}" if proc.returncode != 0 else "\n\nDone."
+    yield output
+
+
 def run_export_gguf(profile: str, family: str):
     yield from run_script("export_gguf.py", profile, family)
 
@@ -416,6 +450,17 @@ with gr.Blocks(title="sft-wagmi") as demo:
         export_dpo_btn = gr.Button("Export Merged Model (DPO)", variant="primary")
         export_dpo_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
         export_dpo_btn.click(fn=run_export_dpo_merged, inputs=[profile, family], outputs=export_dpo_out)
+
+    with gr.Tab("7d. Export Merged (GRPO)"):
+        gr.Markdown(
+            "**Merge GRPO adapter + push to Hub.** Uses `jeanbaptdzd/wagmi-qwen2.5-14b-sft-dpo-grpo` "
+            "as the adapter source and pushes merged safetensors to "
+            "`wagmi-qwen2.5-14b-sft-dpo-grpo-merged`. "
+            "Run this after GRPO training. Then run `scripts/local_gguf_export.sh auth-grpo` locally."
+        )
+        export_grpo_btn = gr.Button("Export Merged Model (GRPO)", variant="primary")
+        export_grpo_out = gr.Textbox(label="Output", lines=30, max_lines=80, autoscroll=True)
+        export_grpo_btn.click(fn=run_export_grpo_merged, inputs=[profile, family], outputs=export_grpo_out)
 
     with gr.Tab("7b. Export GGUF (legacy)"):
         gr.Markdown(
