@@ -207,7 +207,6 @@ try:
         optimized = optimizer.compile(
             module,
             trainset=trainset,
-            num_trials=GEPA_MAX_ROUNDS * 5,
             minibatch=True,
             minibatch_size=min(8, len(trainset)),
             minibatch_full_eval_steps=GEPA_MAX_ROUNDS,
