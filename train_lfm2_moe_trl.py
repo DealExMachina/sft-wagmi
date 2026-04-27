@@ -126,6 +126,7 @@ def run() -> None:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
+    tokenizer.model_max_length = MAX_SEQ_LEN
 
     bnb_cfg = BitsAndBytesConfig(
         load_in_4bit=True,
@@ -170,7 +171,6 @@ def run() -> None:
         save_strategy="epoch",
         bf16=BF16,
         fp16=not BF16,
-        max_seq_length=MAX_SEQ_LEN,
         dataset_text_field=None,   # we use formatting_func
         packing=False,
         push_to_hub=False,         # manual push below
