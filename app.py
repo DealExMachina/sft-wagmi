@@ -1,11 +1,18 @@
 """Minimal Gradio UI for triggering baseline eval and SFT training.
 
-Hugging Face Docker Space constraints (see hub docs: Spaces / Docker):
-- The process must listen on the port declared as ``app_port`` in README front matter
-  (here: 7860). Gradio also reads ``GRADIO_SERVER_PORT`` / ``PORT`` if set — keep them
-  aligned with ``app_port`` or the proxy will not reach the app.
-- Bind on ``0.0.0.0`` (``GRADIO_SERVER_NAME``) so the platform can route inbound traffic.
-- Overlapping restarts can leave stale listeners; we probe/cleanup before bind.
+Hugging Face Docker Space (L40) layout:
+- **Gradio (this file):** single HTTP server for the tabbed UI. Bind ``0.0.0.0`` on the port
+  from ``GRADIO_SERVER_PORT`` / ``PORT`` (Gradio+HF convention) or **7860**, matching
+  README ``app_port`` so the Hub reverse proxy can reach the app. Do not pick
+  an arbitrary other port in production, or the public URL will not map correctly.
+- **Spaces Dev Mode:** the platform or a wrapper can already hold 7860. Set
+  ``GRADIO_SERVER_PORT`` (e.g. ``7861``) in the Space / dev environment so *this* process
+  binds a free port the dev UI documents — do not rely on silent port hunting.
+- **Batch work (eval, SFT, red team):** run as normal Python/ bash in the **same
+  container** (SSH, terminal in Cursor remote, or ``hf jobs``), e.g. ``python3 eval_redteam.py``
+  or ``./scripts/hf/run_redteam_auth_l40.sh``. That does **not** require Gradio to be up.
+- Overlapping restarts can leave **stale** Gradio listeners; we wait and best-effort clear
+  only when the port is still in use.
 """
 
 import os
@@ -256,7 +263,7 @@ def get_version():
 
 
 def _docker_space_listen_port() -> int:
-    """Port Gradio binds to — must match README ``app_port`` for Docker Spaces."""
+    """Port Gradio binds to — follow Gradio + HF (``GRADIO_SERVER_PORT`` / ``PORT``) then 7860."""
     for key in ("GRADIO_SERVER_PORT", "PORT"):
         raw = os.environ.get(key)
         if raw is not None and str(raw).strip() != "":
@@ -477,7 +484,7 @@ if __name__ == "__main__":
     listen_port = _docker_space_listen_port()
     print(
         f"Gradio launch: server_name={listen_host!r} server_port={listen_port} "
-        f"(HF Docker: align with README app_port; optional env GRADIO_SERVER_PORT / PORT)",
+        f"(align README app_port; override with GRADIO_SERVER_PORT / PORT)",
         flush=True,
     )
     if not _wait_until_port_free(listen_port, host=listen_host):
@@ -487,8 +494,12 @@ if __name__ == "__main__":
         )
         _terminate_stale_listeners(listen_port)
         if not _wait_until_port_free(listen_port, host=listen_host, timeout_s=20.0):
-            print(
-                f"Port {listen_port} remains busy; launching anyway and letting Gradio surface the error.",
-                flush=True,
+            raise SystemExit(
+                f"Port {listen_port} is still in use (cannot bind Gradio).\n"
+                "• **Normal Docker Space:** restart or factory-rebuild; keep README app_port 7860 in sync with this bind.\n"
+                "• **Spaces Dev Mode:** if another process already holds 7860, set GRADIO_SERVER_PORT to a free port (e.g. 7861) in the dev environment and refresh.\n"
+                "• **Eval / SFT / red team:** run in a shell, not through Gradio — e.g. "
+                "cd /app && ./scripts/hf/run_redteam_auth_l40.sh  or  "
+                "LLM_FAMILY=qwen MODEL_PROFILE=auth python3 eval_redteam.py\n"
             )
     demo.queue().launch(server_name=listen_host, server_port=listen_port)
