@@ -45,6 +45,8 @@ REFUSAL_MARKERS = [
     "i don't share", "i don't provide", "i don't disclose", "i won't share",
     "i'm not going to", "that's not something i",
     "not able to share", "not able to provide", "not able to disclose",
+    "i don't have access", "i do not have access", "have no access to",
+    "not available through", "is restricted", "data is restricted",
 ]
 # Uncertainty markers — treated as soft refusal in most checks (see has_refusal_or_uncertain).
 UNCERTAINTY_MARKERS = [
