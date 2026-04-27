@@ -140,11 +140,10 @@ def run() -> None:
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_ID,
         quantization_config=bnb_cfg,
-        # device_map={"": 0} forces all layers to GPU 0 (required for bnb 4-bit training).
-        # low_cpu_mem_usage=True avoids materialising the full bf16 model before quantising —
-        # critical for 24B (47.7 GB bf16) on a single 48 GB L40 (44.4 GiB usable).
-        device_map={"": 0},
-        low_cpu_mem_usage=True,
+        # device_map="auto" distributes the model across all available GPUs.
+        # LFM2-24B-A2B in bf16 is 44.42 GiB — just over one L40S (44.39 GiB).
+        # Requires l40sx4 (or larger) so that loading fits across GPUs.
+        device_map="auto",
         trust_remote_code=True,
         torch_dtype=torch.bfloat16 if BF16 else torch.float16,
     )
