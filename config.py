@@ -164,7 +164,7 @@ _REGISTRY: dict[str, dict[str, dict]] = {
             "dataset_num_proc": 2,
         },
         "auth": {
-            "model_id": "unsloth/LFM2-8B-A1B",
+            "model_id": "LiquidAI/LFM2-8B-A1B",
             "adapter_dir": "output/wagmi-lfm2-auth-sft",
             "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
             "hub_merged": "jeanbaptdzd/wagmi-lfm2-auth-sft-merged",

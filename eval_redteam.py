@@ -137,7 +137,7 @@ def run() -> dict:
         print(f"Loading base model: {BASE_MODEL_ID}")
         print(f"Loading adapter: {adapter_path}")
 
-        if MODEL_PROFILE == "auth":
+        if MODEL_PROFILE == "auth" and LLM_FAMILY == "qwen":
             from unsloth import FastLanguageModel
 
             model, tokenizer = FastLanguageModel.from_pretrained(
@@ -147,6 +147,24 @@ def run() -> dict:
                 load_in_4bit=True,
             )
             FastLanguageModel.for_inference(model)
+        elif MODEL_PROFILE == "auth" and LLM_FAMILY == "lfm2":
+            # LFM2-8B-A1B uses custom_code (MoE architecture); load via vanilla PEFT
+            # with trust_remote_code=True and 4-bit bitsandbytes quantization.
+            from peft import PeftModel
+            from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+            bnb_cfg = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=DTYPE)
+            tokenizer = AutoTokenizer.from_pretrained(
+                adapter_path, trust_remote_code=True
+            )
+            base_model = AutoModelForCausalLM.from_pretrained(
+                BASE_MODEL_ID,
+                quantization_config=bnb_cfg,
+                device_map="auto",
+                trust_remote_code=True,
+            )
+            model = PeftModel.from_pretrained(base_model, adapter_path)
+            model.eval()
         else:
             from peft import PeftModel
             from transformers import AutoModelForCausalLM, AutoTokenizer
