@@ -77,9 +77,11 @@ AUTH_TOOLING_MULTIPLIER = int(os.environ.get("AUTH_TOOLING_MULTIPLIER", "3"))
 # The MoE uses gate/expert projection layers; include them for alignment quality.
 # Falls back gracefully if a module is absent (PEFT skips unknowns).
 TARGET_MODULES = [
+    # Attention projections (shared across all LFM2 MoE variants)
     "q_proj", "k_proj", "v_proj", "o_proj",
+    # Standard FFN layers (non-expert, if present)
     "gate_proj", "up_proj", "down_proj",
-    # MoE expert projections (LFM2-8B-A1B specific)
+    # MoE expert projections (lfm2_moe architecture: LFM2-8B-A1B, LFM2-24B-A2B)
     "w1", "w2", "w3",
 ]
 
@@ -110,7 +112,7 @@ def formatting_func(example: dict) -> str:
 
 def run() -> None:
     if not torch.cuda.is_available():
-        raise SystemExit("CUDA GPU required for LFM2-8B-A1B QLoRA training.")
+        raise SystemExit(f"CUDA GPU required for {MODEL_ID} QLoRA training.")
 
     print(f"=== LFM2 MoE SFT (TRL) — v{MODEL_VERSION} ===")
     print(f"Model:   {MODEL_ID}")

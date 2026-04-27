@@ -141,8 +141,9 @@ _REGISTRY: dict[str, dict[str, dict]] = {
     },
 
     # ── Liquid AI LFM2 ────────────────────────────────────────────────────────
-    # Use unsloth/ IDs when training with Unsloth (FastLanguageModel).
-    # Upstream LiquidAI/ IDs are valid for plain Transformers/PEFT only.
+    # LFM2 MoE models use LiquidAI/ IDs (plain Transformers/PEFT with trust_remote_code).
+    # LFM2-24B-A2B: 47.7 GB bf16 → ~12 GB 4-bit; lfm2_moe natively supported in
+    # transformers>=4.51. No Unsloth mirror. Uses TRL+PEFT path (train_lfm2_moe_trl.py).
     "lfm2": {
         # LFM2.5 small: align with Liquid Unsloth quick-start (r=16, alpha=32) and Unsloth LoRA
         # guide (LR ~1e-4–2e-4 band, effective batch ~16). See docs.liquid.ai/lfm/fine-tuning/unsloth
@@ -164,18 +165,18 @@ _REGISTRY: dict[str, dict[str, dict]] = {
             "dataset_num_proc": 2,
         },
         "auth": {
-            "model_id": "LiquidAI/LFM2-8B-A1B",
-            "adapter_dir": "output/wagmi-lfm2-auth-sft",
-            "hub_adapter": "jeanbaptdzd/wagmi-lfm2-auth-sft",
-            "hub_merged": "jeanbaptdzd/wagmi-lfm2-auth-sft-merged",
-            "hub_gguf": "jeanbaptdzd/wagmi-lfm2-auth-sft-gguf",
+            "model_id": "LiquidAI/LFM2-24B-A2B",
+            "adapter_dir": "output/wagmi-lfm2-24b-auth-sft",
+            "hub_adapter": "jeanbaptdzd/wagmi-lfm2-24b-auth-sft",
+            "hub_merged": "jeanbaptdzd/wagmi-lfm2-24b-auth-sft-merged",
+            "hub_gguf": "jeanbaptdzd/wagmi-lfm2-24b-auth-sft-gguf",
             "ollama_name": "wagmi-lfm2-auth",
             "max_seq_len": 2048,
             "load_in_4bit": True,
             "lora_r": 32,
             "lora_alpha": 64,
             "learning_rate": 2e-5,
-            "num_epochs": 2,
+            "num_epochs": 3,
             "per_device_batch": 1,
             "grad_accum": 8,
             "dataset_num_proc": 1,
