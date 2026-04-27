@@ -140,7 +140,10 @@ def run() -> None:
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_ID,
         quantization_config=bnb_cfg,
-        device_map="auto",
+        # Force all layers onto GPU 0 — bitsandbytes 4-bit training requires
+        # all parameters on GPU (CPU offloading is not supported during training).
+        # device_map="auto" is too conservative for 24B on a single 48 GB L40.
+        device_map={"": 0},
         trust_remote_code=True,
         torch_dtype=torch.bfloat16 if BF16 else torch.float16,
     )

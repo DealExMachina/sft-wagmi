@@ -160,7 +160,7 @@ def run() -> dict:
             base_model = AutoModelForCausalLM.from_pretrained(
                 BASE_MODEL_ID,
                 quantization_config=bnb_cfg,
-                device_map="auto",
+                device_map={"": 0},
                 trust_remote_code=True,
             )
             model = PeftModel.from_pretrained(base_model, adapter_path)
