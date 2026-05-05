@@ -13,7 +13,7 @@ app_port: 7860
   <a href="https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct"><img src="https://img.shields.io/badge/Small-Qwen_2.5_1.5B-blue?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==" alt="Qwen 2.5 1.5B"></a>
   <a href="https://huggingface.co/Qwen/Qwen2.5-14B-Instruct"><img src="https://img.shields.io/badge/Auth-Qwen_2.5_14B-blue?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==" alt="Qwen 2.5 14B"></a>
   <a href="https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct"><img src="https://img.shields.io/badge/Small-LFM2.5_1.2B-teal?logo=huggingface" alt="LFM2.5 1.2B Unsloth mirror"></a>
-  <a href="https://huggingface.co/unsloth/LFM2-8B-A1B"><img src="https://img.shields.io/badge/Auth-LFM2_8B-teal?logo=huggingface" alt="LFM2 8B Unsloth mirror"></a>
+  <a href="https://huggingface.co/LiquidAI/LFM2-24B-A2B"><img src="https://img.shields.io/badge/Auth-LFM2_24B-teal?logo=huggingface" alt="LFM2 24B LiquidAI"></a>
   <a href="https://huggingface.co/collections/LiquidAI/lfm2-model-collection-67f8152be4674776f7de900e"><img src="https://img.shields.io/badge/Liquid_AI-LFM2-0d9488?logo=huggingface" alt="Liquid AI LFM2 collection"></a>
 </p>
 <p align="center">
@@ -27,9 +27,9 @@ app_port: 7860
 
 ---
 
-**Version `0.3.4`.** History: [CHANGELOG.md](CHANGELOG.md).
+**Version `0.3.5`.** History: [CHANGELOG.md](CHANGELOG.md).
 
-SFT and export for **Wagmi** (bilingual assistant for [Deal ex Machina](https://dealexmachina.com)). Base families: **Qwen 2.5** (`LLM_FAMILY=qwen`) and **Liquid LFM2** (`LLM_FAMILY=lfm2`). Profiles: **`small`** (anonymous tier), **`auth`** (tool-capable tier). Training: [Unsloth](https://github.com/unslothai/unsloth) + [TRL](https://github.com/huggingface/trl). Default Hub checkpoints for LFM2 and Qwen3 training paths use **`unsloth/...`** IDs (see Training). Production inference is **Ollama** today; **llama.cpp** is used for GGUF conversion and is under evaluation as a direct OpenAI-compatible server ([dexm-one-page](https://github.com/DealExMachina/dexm-one-page): `LLM_RUNTIME=llamacpp`, `LLM_API_URL_*`).
+SFT and export for **Wagmi** (bilingual assistant for [Deal ex Machina](https://dealexmachina.com)). Base families: **Qwen 2.5** (`LLM_FAMILY=qwen`) and **Liquid LFM2** (`LLM_FAMILY=lfm2`). Profiles: **`small`** (anonymous tier), **`auth`** (tool-capable tier). Training: [Unsloth](https://github.com/unslothai/unsloth) + [TRL](https://github.com/huggingface/trl). Default Hub checkpoints for LFM2 small and Qwen3 training paths use **`unsloth/...`** IDs; lfm2 auth uses **`LiquidAI/LFM2-24B-A2B`** (TRL+PEFT path, no Unsloth mirror). See Training. Production inference is **Ollama** today; **llama.cpp** is used for GGUF conversion and is under evaluation as a direct OpenAI-compatible server ([dexm-one-page](https://github.com/DealExMachina/dexm-one-page): `LLM_RUNTIME=llamacpp`, `LLM_API_URL_*`).
 
 Downstream site couples **RAG** ([`local-rag.ts`](https://github.com/DealExMachina/dexm-one-page/blob/dev/src/lib/chat/local-rag.ts)), **SFT** (this repo’s JSONL), and optional **autotune** (GPT-4o judge loop in `autotune.py`).
 
@@ -72,7 +72,7 @@ After `export-merged` on the Space, local GGUF (typical): `./scripts/local_gguf_
 
 | Item | Value |
 | --- | --- |
-| Bases | `qwen`: [Qwen2.5-1.5B](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) / [14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct); `lfm2`: [unsloth/LFM2.5-1.2B-Instruct](https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct) / [unsloth/LFM2-8B-A1B](https://huggingface.co/unsloth/LFM2-8B-A1B) |
+| Bases | `qwen`: [Qwen2.5-1.5B](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) / [14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct); `lfm2`: [unsloth/LFM2.5-1.2B-Instruct](https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct) / [LiquidAI/LFM2-24B-A2B](https://huggingface.co/LiquidAI/LFM2-24B-A2B) |
 | LoRA / LR / batch | Defaults in [`config.py`](config.py) `_REGISTRY`: **qwen** small/auth use r=32, α=64, LR `5e-5` / `2e-5`. **lfm2** small: r=16, α=32, LR `1e-4`, `per_device_batch` 2, `grad_accum` 8 (effective batch 16). **lfm2** auth: r=32, α=64, LR `2e-5`. Override with `SMALL_*` / `AUTH_*` env. |
 | Other | Max seq 2048, bf16, cosine schedule, q/k/v/o + MLP targets (see `train.py`). Stack: Unsloth `FastLanguageModel` + TRL `SFTTrainer`. |
 
@@ -168,7 +168,7 @@ Upstream licenses differ. **LFM** checkpoints (including `unsloth/` mirrors) are
 | --- | --- | --- |
 | Qwen2.5-1.5B / 14B-Instruct | Apache 2.0 | [1.5B](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct), [14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct) |
 | LFM2.5-1.2B (incl. `unsloth/` mirror) | LFM Open License v1.0 | [Terms](https://liquid.ai/lfm-license); [unsloth](https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct), [LiquidAI](https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct) |
-| LFM2-8B-A1B (incl. `unsloth/` mirror) | LFM Open License v1.0 | [Terms](https://liquid.ai/lfm-license); [unsloth](https://huggingface.co/unsloth/LFM2-8B-A1B), [LiquidAI](https://huggingface.co/LiquidAI/LFM2-8B-A1B) |
+| LFM2-24B-A2B | LFM Open License v1.0 | [Terms](https://liquid.ai/lfm-license); [LiquidAI](https://huggingface.co/LiquidAI/LFM2-24B-A2B) |
 | Unsloth, TRL | Apache 2.0 | GitHub repos linked above |
 | llama.cpp, Ollama | MIT | Project repos |
 | GPT-4o (autotune) | Proprietary | OpenAI |
