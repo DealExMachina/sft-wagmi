@@ -1,0 +1,34 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area docs --instruction focus on stale or redundant docs, keep README links valid
+
+Here is the housekeeping summary.
+
+---
+
+### 1) Files changed
+
+| File | Change |
+|------|--------|
+| `docs/RECURRING_TRAINING_PLAN.md` | **Removed** |
+| `docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md` | Clarified optional `--family` / `--profile` values vs `prepare_hf_model_cards_ai_act.py` |
+| `README.md` | Linked Cursor SDK automation to `scripts/hf/README.md` for Space / HF Jobs / `recurring_runner.py` |
+| `scripts/hf/README.md` | Corrected LFM2 auth base name to **LFM2-24B-A2B** (matches `config.py`) |
+
+---
+
+### 2) Why each change was needed
+
+- **`docs/RECURRING_TRAINING_PLAN.md` removal:** The doc described future deliverables (`recurring_runner.py`, `configs/recurring_runs.json`, runbook in `scripts/hf/README.md`) that **already exist** and are maintained next to the code. It duplicated `scripts/hf/README.md` and read like an outdated project plan. No inbound references were found in the repo.
+- **`HF_MODEL_CARD_AI_ACT_RUNBOOK.md`:** Aligns the runbook with the script’s argparse (`qwen3` and the allowed families/profiles) so filters are not underspecified.
+- **`README.md`:** Connects the Cursor SDK section to the canonical HF/recurring runbook so readers are not stuck with only `npm` commands when they need Space/HF Job behavior.
+- **`scripts/hf/README.md`:** The LFM2 auth line cited the wrong model; `config.py` uses `LiquidAI/LFM2-24B-A2B` for the auth track.
+
+---
+
+### 3) Follow-up manual actions
+
+- **Bookmarks or external links:** Anything pointing at `docs/RECURRING_TRAINING_PLAN.md` should be repointed to [`scripts/hf/README.md`](scripts/hf/README.md) (or to the Cursor SDK section of the root README, which now links there).
+- **Optional:** If you maintain an internal wiki or issue templates that mentioned the old plan doc, update those paths the same way.
+
+No commits or destructive git operations were run. Root README links to `docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md` in the Compliance section remain valid.

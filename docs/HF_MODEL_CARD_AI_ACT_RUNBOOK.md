@@ -14,7 +14,7 @@ From `sft-wagmi/`:
 python3 scripts/prepare_hf_model_cards_ai_act.py
 ```
 
-Optional filtering:
+Optional filtering (`--family`: `qwen`, `qwen3`, `lfm2`; `--profile`: `small`, `auth`):
 
 ```bash
 python3 scripts/prepare_hf_model_cards_ai_act.py --family qwen --profile small
