@@ -107,6 +107,36 @@ python3 eval_sft.py && python3 eval_sft_rag.py && python3 eval_redteam.py
 # or: python3 scripts/pipeline.py --all --family lfm2 --profile small
 ```
 
+## Cursor SDK recurring automations
+
+The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration.
+
+```bash
+cd automation/cursor-sdk
+npm install
+```
+
+HouseKeeper (docs and README hygiene):
+
+```bash
+CURSOR_API_KEY=... npm run run:housekeeper
+CURSOR_API_KEY=... npm run run:housekeeper -- --area docs --instruction "focus on stale runbooks first"
+```
+
+Recurring training orchestrator trigger:
+
+```bash
+CURSOR_API_KEY=... npm run run:recurring -- --cadence daily --trigger scheduler
+CURSOR_API_KEY=... npm run run:recurring -- --cadence weekly --trigger scheduler
+```
+
+Suggested cron shape (outside repo):
+
+```bash
+# nightly docs housekeeping
+0 2 * * * cd /path/to/sft-wagmi/automation/cursor-sdk && CURSOR_API_KEY=... npm run run:housekeeper -- --area .
+```
+
 ## Autotune
 
 `autotune.py`: generate on eval set → GPT-4o scores six criteria (0–3) → corrector for failures → merge → retrain → Hub push; repeat until mean score > 2.5/3 or three iterations. Requires `OPENAI_API_KEY` and `HF_TOKEN`.
@@ -137,6 +167,24 @@ chmod +x scripts/recreate_ollama_wagmi.sh scripts/smoke_ollama_tools.sh
 ## Versioning
 
 Semver in [`VERSION`](VERSION): MAJOR = persona/base/schema break; MINOR = dataset or capability change; PATCH = hyperparameters or tooling. Release flow: add JSONL under `data/next/` → [`scripts/merge_next.py`](scripts/merge_next.py) → `pipeline.py --all` → [CHANGELOG.md](CHANGELOG.md) entry → commit.
+
+## Prompt philosophy and retrain checklist
+
+The downstream site ([dexm-one-page](https://github.com/DealExMachina/dexm-one-page)) ships **slim** system prompts split by tier. Encyclopedic Deal ex Machina facts (services, blog, stack, partners) are not inlined — they flow through `buildLocalRagContext()` from `src/lib/chat/wagmi-skills.md`, `SKILLS.md`, and `public/ai.txt`. SFT examples should match that contract:
+
+| Profile | Site tier | Tools in production | Behavioural target |
+| --- | --- | --- | --- |
+| `small` | CPU / anonymous | **None** (enforced server-side) | Safety-first, factual, ~100 words, no tool JSON, point users to the on-page sign-in panel for auth. |
+| `auth` | GPU / authenticated | `auth-user`, `email.send` (connected user only), `calendar.create_event` (JB only) | Fuller DxM knowledge in concise paragraphs, structured tool-call examples where present, same safety floor. |
+
+Retrain checklist when a prompt-philosophy change lands in dexm-one-page:
+
+1. Confirm `data/train.jsonl` / `data/eval.jsonl` system messages match the slim canonical form (no encyclopedic dumps).
+2. For `small` profile rows: assistant turns must never call tools. Add hard-negatives in `data/next/` for any leaked tool JSON.
+3. For `auth` profile rows: keep `data/tooling_email_calendar.jsonl` as the only path that produces tool calls; oversample via `AUTH_TOOLING_MULTIPLIER`.
+4. Run `python3 scripts/pipeline.py --all --profile small` then `--profile auth` (per family if both `qwen` and `lfm2` ship).
+5. Red-team: `pipeline.py --redteam` for both profiles; verify the small profile fails closed when prompted to invent tool calls or emails.
+6. Bump `VERSION` (MINOR for behavioural change), update `CHANGELOG.md`, and tag the dexm-one-page commit that consumes the new tags.
 
 ## Red-team reports
 

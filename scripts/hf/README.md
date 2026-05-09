@@ -50,3 +50,57 @@ python3 scripts/redteam_dexm_chat_api_smoke.py --max-cases 8
 ```
 
 Uses [`guardrail_checks.py`](../../guardrail_checks.py) (same assertions as `eval_redteam`). Streamed LLM replies are checked heuristically on the raw stream body (line-oriented UI protocol); JSON `action_refused` / `blocked` bodies are preferred for deterministic cases.
+
+## Recurring runner (Phase 2)
+
+Use [`recurring_runner.py`](./recurring_runner.py) to orchestrate regular runs directly from the Space shell:
+
+```bash
+cd /app
+python3 scripts/hf/recurring_runner.py --cadence daily --trigger manual
+python3 scripts/hf/recurring_runner.py --cadence weekly --trigger manual
+python3 scripts/hf/recurring_runner.py --run-id weekly-qwen-auth --trigger manual
+```
+
+Configuration lives in [`configs/recurring_runs.json`](../../configs/recurring_runs.json):
+
+- `runs[].cadence`: `daily` or `weekly`
+- `runs[].family` / `runs[].profile`: fed to `scripts/pipeline.py`
+- `runs[].merge_next`: `auto|always|never`
+- `runs[].skip_if_no_pending_data`: avoid expensive runs when `data/next/*.jsonl` is empty
+- `runs[].timeout_minutes`: hard timeout per matrix run
+- `runs[].env`: run-specific environment overrides
+- `runs[].continue_on_failure`: stop matrix on critical run failure (unless `--allow-partial`)
+
+Failure categorization:
+
+- `infra`: OOM, timeout, network/runtime infra symptoms
+- `data`: dataset/schema/JSON/missing-input failures
+- `model_quality`: redteam/guardrail/eval quality-gate-type failures
+- `unknown`: non-zero exit without a recognized signature
+
+Reporting:
+
+- Logs + summaries are written under `reports/recurring/<timestamp>/`
+- If `gh` and `GH_TOKEN` (or `GITHUB_TOKEN`) are available, a comment is posted to the configured tracking issue (`issue_number`)
+- Otherwise, the issue comment draft is saved locally in the same report folder
+
+Backend mode:
+
+- `backend=local`: execute `scripts/pipeline.py` directly in current environment
+- `backend=hf_jobs`: submit `hf jobs run` using configured image/flavor/secrets (default in `configs/recurring_runs.json`)
+
+## Cursor SDK trigger (no manual Space shell)
+
+To avoid manual execution in the Space shell, this repo includes a Cursor SDK launcher:
+
+- `automation/cursor-sdk/src/run-recurring.ts`
+- GitHub Actions schedule: `.github/workflows/recurring-training-cursor-sdk.yml`
+
+The SDK launcher asks a Cursor agent to execute:
+
+```bash
+python3 scripts/hf/recurring_runner.py --cadence <daily|weekly> --trigger <...>
+```
+
+With current config, this submits **HF Jobs** against the Space image (`hf.co/spaces/jeanbaptdzd/sft-wagmi`) rather than running training locally.
