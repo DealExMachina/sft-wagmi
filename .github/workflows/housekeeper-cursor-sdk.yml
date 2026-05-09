@@ -72,34 +72,36 @@ jobs:
             cmd+=(--instruction "$instruction_input")
           fi
 
-          mkdir -p "$GITHUB_WORKSPACE/.housekeeper"
-          "${cmd[@]}" | tee "$GITHUB_WORKSPACE/.housekeeper/agent-output.log"
+          mkdir -p "$GITHUB_WORKSPACE/housekeeper-artifacts"
+          "${cmd[@]}" | tee "$GITHUB_WORKSPACE/housekeeper-artifacts/agent-output.log"
 
       - name: Collect run summary artifacts
         if: always()
         shell: bash
         run: |
-          mkdir -p .housekeeper
-          git status --short > .housekeeper/git-status.txt
-          git diff --stat > .housekeeper/git-diff-stat.txt
-          git diff > .housekeeper/git-diff.patch
+          mkdir -p housekeeper-artifacts
+          git status --short > housekeeper-artifacts/git-status.txt
+          git diff --stat > housekeeper-artifacts/git-diff-stat.txt
+          git diff > housekeeper-artifacts/git-diff.patch
           {
             echo "run_id=${{ github.run_id }}"
             echo "run_attempt=${{ github.run_attempt }}"
             echo "event=${{ github.event_name }}"
             echo "ref=${{ github.ref }}"
-          } > .housekeeper/metadata.txt
+          } > housekeeper-artifacts/metadata.txt
 
       - name: Upload HouseKeeper artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: housekeeper-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .housekeeper/
+          path: housekeeper-artifacts/
           if-no-files-found: warn
 
       - name: Open PR with HouseKeeper changes
         if: ${{ success() && (github.event_name != 'workflow_dispatch' || inputs.auto_pr) }}
+        env:
+          HUSKY: "0"
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
