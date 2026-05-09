@@ -1,0 +1,83 @@
+{
+  "repo": "DealExMachina/sft-wagmi",
+  "issue_number": 2,
+  "runs": [
+    {
+      "id": "daily-qwen-small",
+      "name": "Daily qwen small",
+      "enabled": true,
+      "cadence": "daily",
+      "family": "qwen",
+      "profile": "small",
+      "sync_dataset": true,
+      "merge_next": "auto",
+      "bump": "minor",
+      "skip_if_no_pending_data": true,
+      "timeout_minutes": 180,
+      "continue_on_failure": true,
+      "env": {},
+      "backend": "hf_jobs",
+      "hf_job_image": "hf.co/spaces/jeanbaptdzd/sft-wagmi",
+      "hf_job_flavor": "l40sx1",
+      "hf_job_secrets": ["HF_TOKEN"],
+      "pipeline_flags": [
+        "--train",
+        "--eval",
+        "--redteam",
+        "--export-merged"
+      ]
+    },
+    {
+      "id": "weekly-qwen-auth",
+      "name": "Weekly qwen auth",
+      "enabled": true,
+      "cadence": "weekly",
+      "family": "qwen",
+      "profile": "auth",
+      "sync_dataset": true,
+      "merge_next": "auto",
+      "bump": "minor",
+      "skip_if_no_pending_data": false,
+      "timeout_minutes": 360,
+      "continue_on_failure": false,
+      "env": {
+        "AUTH_MAX_SEQ_LEN": "1024"
+      },
+      "backend": "hf_jobs",
+      "hf_job_image": "hf.co/spaces/jeanbaptdzd/sft-wagmi",
+      "hf_job_flavor": "l40sx1",
+      "hf_job_secrets": ["HF_TOKEN"],
+      "pipeline_flags": [
+        "--train",
+        "--eval",
+        "--redteam",
+        "--export-merged"
+      ]
+    },
+    {
+      "id": "weekly-lfm2-auth",
+      "name": "Weekly lfm2 auth (optional)",
+      "enabled": false,
+      "cadence": "weekly",
+      "family": "lfm2",
+      "profile": "auth",
+      "sync_dataset": true,
+      "merge_next": "auto",
+      "bump": "minor",
+      "skip_if_no_pending_data": false,
+      "timeout_minutes": 420,
+      "continue_on_failure": true,
+      "env": {},
+      "backend": "hf_jobs",
+      "hf_job_image": "hf.co/spaces/jeanbaptdzd/sft-wagmi",
+      "hf_job_flavor": "l40sx1",
+      "hf_job_secrets": ["HF_TOKEN"],
+      "pipeline_flags": [
+        "--train",
+        "--eval",
+        "--redteam",
+        "--export-merged"
+      ]
+    }
+  ]
+}

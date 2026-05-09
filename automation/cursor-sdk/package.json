@@ -1,0 +1,17 @@
+{
+  "name": "sft-wagmi-cursor-sdk-automation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "run:recurring": "tsx src/run-recurring.ts",
+    "run:housekeeper": "tsx src/run-housekeeper.ts"
+  },
+  "dependencies": {
+    "@cursor/sdk": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}

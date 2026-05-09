@@ -1,0 +1,115 @@
+name: HouseKeeper docs maintenance (Cursor SDK)
+
+on:
+  workflow_dispatch:
+    inputs:
+      area:
+        description: "Prioritized path scope (default: .)"
+        required: false
+        default: "."
+      instruction:
+        description: "Optional extra instruction"
+        required: false
+        default: ""
+      auto_pr:
+        description: "Automatically open a PR when changes are produced"
+        type: boolean
+        required: false
+        default: true
+  schedule:
+    # Nightly docs cleanup at 02:00 UTC
+    - cron: "0 2 * * *"
+
+jobs:
+  housekeeper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate required secrets
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "$CURSOR_API_KEY" ]]; then
+            echo "::error::Missing CURSOR_API_KEY secret."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Cursor SDK automation deps
+        working-directory: automation/cursor-sdk
+        run: npm install
+
+      - name: Trigger HouseKeeper via Cursor SDK
+        working-directory: automation/cursor-sdk
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          CURSOR_MODEL_ID: composer-2
+        shell: bash
+        run: |
+          set -euo pipefail
+          area_input="${{ github.event.inputs.area }}"
+          instruction_input="${{ github.event.inputs.instruction }}"
+
+          if [[ -z "$area_input" ]]; then
+            area_input="."
+          fi
+
+          cmd=(npm run run:housekeeper -- --area "$area_input")
+          if [[ -n "$instruction_input" ]]; then
+            cmd+=(--instruction "$instruction_input")
+          fi
+
+          mkdir -p "$GITHUB_WORKSPACE/.housekeeper"
+          "${cmd[@]}" | tee "$GITHUB_WORKSPACE/.housekeeper/agent-output.log"
+
+      - name: Collect run summary artifacts
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p .housekeeper
+          git status --short > .housekeeper/git-status.txt
+          git diff --stat > .housekeeper/git-diff-stat.txt
+          git diff > .housekeeper/git-diff.patch
+          {
+            echo "run_id=${{ github.run_id }}"
+            echo "run_attempt=${{ github.run_attempt }}"
+            echo "event=${{ github.event_name }}"
+            echo "ref=${{ github.ref }}"
+          } > .housekeeper/metadata.txt
+
+      - name: Upload HouseKeeper artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: housekeeper-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .housekeeper/
+          if-no-files-found: warn
+
+      - name: Open PR with HouseKeeper changes
+        if: ${{ success() && (github.event_name != 'workflow_dispatch' || inputs.auto_pr) }}
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/housekeeper-${{ github.run_id }}
+          delete-branch: true
+          title: "chore(docs): automated housekeeper maintenance"
+          commit-message: "chore(docs): automated housekeeper maintenance"
+          body: |
+            Automated HouseKeeper maintenance run.
+
+            - Workflow run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            - Trigger: `${{ github.event_name }}`
+            - Scope input: `${{ github.event.inputs.area || '.' }}`

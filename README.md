@@ -107,6 +107,36 @@ python3 eval_sft.py && python3 eval_sft_rag.py && python3 eval_redteam.py
 # or: python3 scripts/pipeline.py --all --family lfm2 --profile small
 ```
 
+## Cursor SDK recurring automations
+
+The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration.
+
+```bash
+cd automation/cursor-sdk
+npm install
+```
+
+HouseKeeper (docs and README hygiene):
+
+```bash
+CURSOR_API_KEY=... npm run run:housekeeper
+CURSOR_API_KEY=... npm run run:housekeeper -- --area docs --instruction "focus on stale runbooks first"
+```
+
+Recurring training orchestrator trigger:
+
+```bash
+CURSOR_API_KEY=... npm run run:recurring -- --cadence daily --trigger scheduler
+CURSOR_API_KEY=... npm run run:recurring -- --cadence weekly --trigger scheduler
+```
+
+Suggested cron shape (outside repo):
+
+```bash
+# nightly docs housekeeping
+0 2 * * * cd /path/to/sft-wagmi/automation/cursor-sdk && CURSOR_API_KEY=... npm run run:housekeeper -- --area .
+```
+
 ## Autotune
 
 `autotune.py`: generate on eval set → GPT-4o scores six criteria (0–3) → corrector for failures → merge → retrain → Hub push; repeat until mean score > 2.5/3 or three iterations. Requires `OPENAI_API_KEY` and `HF_TOKEN`.
