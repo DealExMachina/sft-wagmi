@@ -6,6 +6,8 @@ documentation aligns with current transparency and governance expectations
 
 It does not auto-publish anything.
 
+**Note:** [`scripts/prepare_hf_model_cards_ai_act.py`](../scripts/prepare_hf_model_cards_ai_act.py) also writes `output/hf-model-card-prep/README.md` with a manifest of generated drafts plus a minimal `hf upload` snippet—this file is the full pre-publish checklist. Optional CLI filters: `--family`, `--profile`, `--out-dir` (see `python3 scripts/prepare_hf_model_cards_ai_act.py --help`).
+
 ## 1) Generate draft cards
 
 From `sft-wagmi/`:

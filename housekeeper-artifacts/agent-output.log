@@ -1,0 +1,27 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area docs --instruction focus on stale or redundant docs, keep README links valid
+
+## 1) Files changed
+
+| File | Action |
+|------|--------|
+| `docs/RECURRING_TRAINING_PLAN.md` | **Deleted** |
+| `README.md` | **Updated** (two small edits) |
+| `docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md` | **Updated** (accuracy note + CLI hints) |
+
+## 2) Why each change was needed
+
+- **`docs/RECURRING_TRAINING_PLAN.md` removed:** It described Phase 1–3 “add `recurring_runner.py` / `configs/recurring_runs.json` / `scripts/hf/README.md`” work that is **already implemented** in the tree; it also described daily steps (e.g. explicit `--preflight`) that **don’t match** the current matrix in `configs/recurring_runs.json`. That made it misleading and duplicative of [`scripts/hf/README.md`](scripts/hf/README.md). There were **no inbound references** in tracked `*.md` / `*.py` / `*.ts` / workflow files.
+
+- **`README.md` (Cursor SDK section):** Added a direct link to [`scripts/hf/README.md`](scripts/hf/README.md) and [`configs/recurring_runs.json`](configs/recurring_runs.json) so recurring automation is documented next to the **actual** orchestration and config—without maintaining a second plan in `docs/`.
+
+- **`README.md` (repository layout):** The `docs/` line only mentioned the AI Act runbook; it now notes the **generated** `output/hf-model-card-prep/` companion README after runs, so the layout matches real artifacts.
+
+- **`docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md`:** Clarified that `prepare_hf_model_cards_ai_act.py` writes a **short** `output/hf-model-card-prep/README.md` (manifest + upload snippet), while this file remains the **full** checklist—correcting a common misconception that the script mirrors the whole runbook.
+
+## 3) Follow-up manual actions
+
+- If anything outside git (wikis, runbooks, bookmarks) pointed at `docs/RECURRING_TRAINING_PLAN.md`, repoint it to [`scripts/hf/README.md`](scripts/hf/README.md) and the README Cursor SDK section.
+- Optional: scan `housekeeper-artifacts/` or other local-only trees for stale links to the deleted file (not searched here).
+- **No commit/push** was done, per your instructions.

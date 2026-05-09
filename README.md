@@ -109,7 +109,7 @@ python3 eval_sft.py && python3 eval_sft_rag.py && python3 eval_redteam.py
 
 ## Cursor SDK recurring automations
 
-The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration.
+The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration. **HF Jobs matrix, config schema, and reporting paths** are documented in [`scripts/hf/README.md`](scripts/hf/README.md) (with [`configs/recurring_runs.json`](configs/recurring_runs.json) as the run matrix).
 
 ```bash
 cd automation/cursor-sdk
@@ -200,7 +200,7 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
 ```text
 sft-wagmi/
 ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
-├── docs/                 HF model-card runbook (AI Act)
+├── docs/                 in-repo copy of the AI Act model-card prep runbook (see also output/ after generation)
 ├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
 │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
 ├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py
