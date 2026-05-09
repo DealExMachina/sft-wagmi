@@ -79,6 +79,7 @@ jobs:
         if: always()
         shell: bash
         run: |
+          rm -rf automation/cursor-sdk/node_modules
           mkdir -p housekeeper-artifacts
           git status --short > housekeeper-artifacts/git-status.txt
           git diff --stat > housekeeper-artifacts/git-diff-stat.txt
@@ -100,6 +101,7 @@ jobs:
 
       - name: Open PR with HouseKeeper changes
         if: ${{ success() && (github.event_name != 'workflow_dispatch' || inputs.auto_pr) }}
+        continue-on-error: true
         env:
           HUSKY: "0"
         uses: peter-evans/create-pull-request@v7
