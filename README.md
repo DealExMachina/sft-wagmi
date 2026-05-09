@@ -54,7 +54,7 @@ python3 scripts/pipeline.py --sync-dataset   # subprocess: npm run dataset:wagmi
 | [`scripts/pipeline.py`](scripts/pipeline.py) | CLI: loads `.env`, sets `MODEL_PROFILE` / `LLM_FAMILY` for subprocesses. |
 | [`config.py`](config.py) | `_REGISTRY`, `resolve_profile_config()`; overrides via `SMALL_*` / `AUTH_*` env (see module docstring). |
 
-**`--all`:** `preflight` → `merge-next` (only if `data/next/*.jsonl` exist) → `train` → `eval` → `eval-rag` → `redteam` → `export-merged`. Does not run `baseline`, `autotune`, or `export-gguf` unless requested.
+**`--all`:** `preflight` → `merge-next` → `train` → `eval` → `eval-rag` → `redteam` → `export-merged`. The merge step always runs but **skips** when `data/next/` has no `.jsonl` files. Does not run `baseline`, `autotune`, or `export-gguf` unless requested.
 
 **Flags:** `--profile small|auth`, `--family qwen|lfm2` (defaults from env; **`qwen3`** exists in `config.py` only for direct `python3 train.py` / eval until CLI adds it), `--sync-dataset`, `--merge-next [--bump patch|minor|major]`, `--dry-run`, per-step toggles as in `--help`.
 
@@ -115,6 +115,8 @@ The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring ma
 cd automation/cursor-sdk
 npm install
 ```
+
+Recurring training on Hugging Face (`configs/recurring_runs.json`, `scripts/hf/recurring_runner.py`, HF Jobs vs local backend, issue reporting): [`scripts/hf/README.md`](scripts/hf/README.md).
 
 HouseKeeper (docs and README hygiene):
 
@@ -200,7 +202,7 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
 ```text
 sft-wagmi/
 ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
-├── docs/                 HF model-card runbook (AI Act)
+├── docs/                 HF model-card prep runbook (AI Act); see `scripts/hf/README.md` for recurring training ops
 ├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
 │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
 ├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py

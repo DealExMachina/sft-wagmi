@@ -1,0 +1,35 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area docs --instruction focus on stale or redundant docs, keep README links valid
+
+Here is what was done.
+
+### 1) Files changed
+
+| File | Action |
+|------|--------|
+| `docs/RECURRING_TRAINING_PLAN.md` | **Deleted** |
+| `README.md` | **Updated** |
+| `docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md` | **Updated** |
+
+### 2) Why each change was needed
+
+- **`docs/RECURRING_TRAINING_PLAN.md` (removed)**  
+  It was a **stale design note**: it still asked for `scripts/hf/recurring_runner.py`, `configs/recurring_runs.json`, and expanded `scripts/hf/README.md`, which **already exist** and are documented in [`scripts/hf/README.md`](scripts/hf/README.md). Keeping it duplicated that runbook and implied unfinished work. There were **no inbound references** in the repo, so deletion was safe.
+
+- **`README.md`**  
+  - **`--all` / merge-next**: The text implied merge-next only ran when `data/next/*.jsonl` existed; `scripts/pipeline.py` actually **always invokes** the merge step on `--all`, and **`merge_next` returns 0 when `data/next/` is empty** ([`pipeline.py`](scripts/pipeline.py) `do_merge`, [`merge_next()`](scripts/pipeline.py)). The README now matches that behavior.  
+  - **Cursor SDK section**: Points readers to **`scripts/hf/README.md`** for recurring HF orchestration (`recurring_runner.py`, `configs/recurring_runs.json`, backends, reporting)—single source of truth and valid links.  
+  - **Repository layout**: `docs/` line now reflects **only** the remaining compliance runbook and defers recurring ops to `scripts/hf/README.md`.
+
+- **`docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md`**  
+  Added a short **See also** with links back to the root README and **`scripts/hf/README.md`**, so the lone doc under `docs/` is not orphaned and complements the recurring/HF ops material without duplicating it.
+
+Existing links such as [`docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md`](docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md) in README and CHANGELOG remain correct.
+
+### 3) Follow-up manual actions
+
+- If anything **outside this repo** (wiki, Slack, bookmarks) pointed at `docs/RECURRING_TRAINING_PLAN.md`, repoint them to **`scripts/hf/README.md`**.
+- Optionally add a **CHANGELOG** line when you next release, noting removal of the redundant recurring plan doc if you keep a paper trail for docs-only changes.
+
+No commits or pushes were made, and no destructive git commands were used.

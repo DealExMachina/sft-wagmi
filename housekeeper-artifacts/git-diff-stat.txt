@@ -1,0 +1,4 @@
+ README.md                            |   6 +-
+ docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md |   5 ++
+ docs/RECURRING_TRAINING_PLAN.md      | 123 -----------------------------------
+ 3 files changed, 9 insertions(+), 125 deletions(-)
