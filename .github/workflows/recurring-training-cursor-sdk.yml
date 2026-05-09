@@ -74,3 +74,12 @@ jobs:
           npm run run:recurring -- \
             --cadence "${{ steps.cadence.outputs.value }}" \
             --trigger "github-actions:${{ github.run_id }}"
+
+      - name: Upload recurring reports artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recurring-reports-${{ github.run_id }}-${{ steps.cadence.outputs.value }}
+          path: reports/recurring/**
+          if-no-files-found: warn
+          retention-days: 14
