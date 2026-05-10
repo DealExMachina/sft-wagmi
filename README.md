@@ -56,7 +56,7 @@ python3 scripts/pipeline.py --sync-dataset   # subprocess: npm run dataset:wagmi
 
 **`--all`:** `preflight` → `merge-next` (only if `data/next/*.jsonl` exist) → `train` → `eval` → `eval-rag` → `redteam` → `export-merged`. Does not run `baseline`, `autotune`, or `export-gguf` unless requested.
 
-**Flags:** `--profile small|auth`, `--family qwen|lfm2` (defaults from env; **`qwen3`** exists in `config.py` only for direct `python3 train.py` / eval until CLI adds it), `--sync-dataset`, `--merge-next [--bump patch|minor|major]`, `--dry-run`, per-step toggles as in `--help`.
+**Flags:** `--profile small|auth`, `--family qwen|lfm2` (defaults from env; **`qwen3`** exists in `config.py` only for direct `python3 train.py` / eval until CLI adds it), `--sync-dataset`, `--merge-next [--bump patch|minor|major]`, `--dry-run`, and explicit step toggles (`--baseline`, `--autotune`, `--eval-tools`, `--export-gguf`, …) as in `--help`.
 
 **Artifacts:** large files on Hugging Face Hub, not git ([`.gitignore`](.gitignore)). **Secrets:** `HF_TOKEN` (Hub), `OPENAI_API_KEY` (autotune).
 
@@ -109,7 +109,7 @@ python3 eval_sft.py && python3 eval_sft_rag.py && python3 eval_redteam.py
 
 ## Cursor SDK recurring automations
 
-The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration.
+The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration. Objectives, cadence, and gates (design reference): [docs/RECURRING_TRAINING_PLAN.md](docs/RECURRING_TRAINING_PLAN.md).
 
 ```bash
 cd automation/cursor-sdk
@@ -200,7 +200,7 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
 ```text
 sft-wagmi/
 ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
-├── docs/                 HF model-card runbook (AI Act)
+├── docs/                 HF model-card AI Act runbook; recurring-training plan (design ref.)
 ├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
 │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
 ├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py

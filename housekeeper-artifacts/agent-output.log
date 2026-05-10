@@ -1,0 +1,30 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area .
+
+## 1) Files changed
+
+| File | Change |
+|------|--------|
+| [`scripts/pipeline.py`](scripts/pipeline.py) | Module docstring aligned with real `--all` behavior (preflight → merge-next → train → eval → eval-rag → redteam → export-merged; no implicit baseline/autotune/eval-tools/export-gguf/sync). |
+| [`README.md`](README.md) | Pipeline flags mention `--eval-tools` (and related toggles); Cursor SDK section links to recurring-training plan; repo layout lists both `docs/` files. |
+| [`scripts/hf/README.md`](scripts/hf/README.md) | Auth LFM2 red-team step describes **`config.py` auth registry** (currently **LiquidAI/LFM2-24B-A2B**), not the old **LFM2-8B-A1B** wording. |
+| [`eval_redteam.py`](eval_redteam.py) | Comment for the auth LFM2 load path updated to match `cfg.model_id` (MoE / custom_code), not a fixed 8B id. |
+| [`docs/RECURRING_TRAINING_PLAN.md`](docs/RECURRING_TRAINING_PLAN.md) | Marked automation as **implemented**, replaced “to do” deliverables with a pointer table, restored **Release gates**, aligned daily steps with `--all` (incl. **eval-rag**), updated operating model + phase narrative, replaced obsolete “Immediate next steps”. |
+| [`automation/cursor-sdk/README.md`](automation/cursor-sdk/README.md) | Link to the recurring-training plan for design context. |
+
+**No files were removed.** Nothing in `docs/` was clearly duplicate enough to delete safely: the plan doc still carries objectives, gates, and risks that [`scripts/hf/README.md`](scripts/hf/README.md) does not; deleting it would drop that without a clear single replacement.
+
+## 2) Why each change was needed
+
+- **`pipeline.py` docstring** contradicted the implementation (it implied baseline/autotune/eval-tools were part of the default workflow).
+- **Root README** understated optional steps and omitted the second `docs/` file; linking the plan avoids repeating cadence/detail in the README.
+- **`scripts/hf/README.md` + `eval_redteam.py` comment** were out of date vs [`config.py`](config.py) (`LiquidAI/LFM2-24B-A2B` for auth `lfm2`).
+- **`RECURRING_TRAINING_PLAN.md`** still read like a greenfield spec (“add orchestrator…”) even though `recurring_runner.py`, `configs/recurring_runs.json`, templates, and the workflow already exist—this removed stale instructions and duplication with the runbook.
+- **`automation/cursor-sdk/README.md`** gives one hop from SDK usage to the design doc.
+
+## 3) Follow-up manual actions
+
+- **Historical changelog vs reality:** [`CHANGELOG.md`](CHANGELOG.md) still says (under `0.3.0`) that auth lfm2 used `unsloth/LFM2-8B-A1B`. If the move to **24B** happened later, consider a short retroactive note on the correct release line so history matches [`config.py`](config.py). I did not edit `CHANGELOG.md` (release record; not requested).
+- **Versioned red-team reports** under `reports/redteam/v0.3.5/` still list old model strings in their bodies; those are **artifacts**, not living docs—update only if you regenerate reports or care about archive consistency.
+- **Review the diff** and commit when ready (per your instructions, no commit was made).

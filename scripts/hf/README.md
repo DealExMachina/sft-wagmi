@@ -19,7 +19,7 @@ The Space **Docker** image runs [`app.py`](../../app.py) (Gradio on `app_port` /
 Runs [`eval_redteam.py`](../../eval_redteam.py) twice (auth profile only):
 
 1. `LLM_FAMILY=qwen` — Qwen2.5-14B + Wagmi auth adapter (local `output/...` or Hub id from `config.py`).
-2. `LLM_FAMILY=lfm2` — LFM2-8B-A1B + Wagmi LFM2 auth adapter.
+2. `LLM_FAMILY=lfm2` — auth base + adapter from `config.py` (`_REGISTRY["lfm2"]["auth"]`, currently **LiquidAI/LFM2-24B-A2B** and matching Hub adapter id).
 
 Requires **CUDA** (e.g. L40 on the Space). Set `HF_TOKEN` if `FastLanguageModel.from_pretrained` must pull a private adapter.
 

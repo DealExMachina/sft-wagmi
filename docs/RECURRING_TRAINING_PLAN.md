@@ -1,5 +1,17 @@
 # Recurring Training Plan (Cursor Agents + HF ml-intern)
 
+## Implementation status
+
+The items under [Minimum technical deliverables](#minimum-technical-deliverables) and the Phase 1–2 automation described below are **implemented** in-repo:
+
+- Runner: [`scripts/hf/recurring_runner.py`](../scripts/hf/recurring_runner.py)
+- Matrix config: [`configs/recurring_runs.json`](../configs/recurring_runs.json)
+- Operational runbook: [`scripts/hf/README.md`](../scripts/hf/README.md) (recurring runner, HF Jobs, Cursor SDK)
+- Cursor SDK package: [`automation/cursor-sdk/README.md`](../automation/cursor-sdk/README.md)
+- Schedule: [`.github/workflows/recurring-training-cursor-sdk.yml`](../.github/workflows/recurring-training-cursor-sdk.yml)
+
+Use the runbook for day-to-day operations; keep this document as the design reference (objectives, cadence, gates, risks).
+
 ## Objective
 
 Run `sft-wagmi` training on a regular cadence with:
@@ -19,7 +31,7 @@ Run `sft-wagmi` training on a regular cadence with:
 1. Cursor scheduled agent starts a run.
 2. Agent determines run type (daily light vs weekly heavy).
 3. Agent submits remote HF execution with required secrets.
-4. Remote job runs `scripts/pipeline.py` with profile/family flags.
+4. Remote job runs the configured training command (in practice `scripts/hf/recurring_runner.py` invoking `scripts/pipeline.py` with matrix flags).
 5. Agent collects outcome signals (success, metrics, redteam status, artifact refs).
 6. Agent updates a tracking issue and flags failures for human review.
 
@@ -28,53 +40,34 @@ Run `sft-wagmi` training on a regular cadence with:
 ### Daily (light)
 
 - `qwen/small`
-- Steps:
+- Steps (equivalent to `scripts/pipeline.py --all` for the chosen profile/family, after optional preflight/sync/merge):
   - `--preflight`
   - optional `--sync-dataset`
   - conditional `--merge-next`
-  - `--train --eval --redteam --export-merged`
+  - `train`, `eval`, `eval-rag`, `redteam`, `export-merged`
 
 ### Weekly (heavy)
 
 - `qwen/auth` (+ optionally `lfm2/auth` once stable)
 - Same steps as daily, with longer timeout and stricter post-run checks.
 
-## Minimum Technical Deliverables
+## Minimum technical deliverables
 
-1. **Orchestrator script**
-   - Add `scripts/hf/recurring_runner.py` (or similar) that:
-     - builds run matrix
-     - submits HF run commands
-     - records job IDs/URLs
-     - formats run summary payload
+These are **in place** (paths above). When extending automation, update `configs/recurring_runs.json` and/or `recurring_runner.py` rather than forking the training entrypoint (`scripts/pipeline.py`).
 
-2. **Run profile config**
-   - Add `configs/recurring_runs.json` (or env-driven equivalent) with:
-     - cadence
-     - family/profile
-     - timeout
-     - optional step flags
+| Deliverable | Location |
+| --- | --- |
+| Orchestrator / matrix | [`scripts/hf/recurring_runner.py`](../scripts/hf/recurring_runner.py) |
+| Run profile config | [`configs/recurring_runs.json`](../configs/recurring_runs.json) |
+| Issue reporting template | [`scripts/hf/templates/recurring_issue_comment.md`](../scripts/hf/templates/recurring_issue_comment.md) |
+| Operational runbook | [`scripts/hf/README.md`](../scripts/hf/README.md) |
 
-3. **Issue reporting template**
-   - Add issue body/comment template for:
-     - run date + trigger
-     - job URL
-     - pipeline command
-     - pass/fail gates
-     - links to reports/model artifacts
-
-4. **Operational runbook**
-   - Expand `scripts/hf/README.md` with:
-     - how scheduler triggers agent
-     - how to pause/resume
-     - how to retry failed runs
-
-## Release Gates
+## Release gates
 
 A run is considered successful only if:
 
 - training exits with code `0`
-- `eval` completes
+- `eval` and `eval-rag` complete
 - `redteam` completes with acceptable threshold
 - `export-merged` completes and target Hub repo receives the expected artifact
 
@@ -84,21 +77,11 @@ If any gate fails:
 - include failing stage and key log excerpt in issue update
 - do not mark model as release candidate
 
-## Phase Plan
+## Phase plan
 
-### Phase 1: Single-path automation (target: 1-2 days)
+Phase 1–2 scope (daily `qwen/small`, weekly `qwen/auth`, configurable matrix, failure categories) is implemented via `recurring_runner.py` and `configs/recurring_runs.json`. Remaining items are hardening (Phase 3) and process, not greenfield build-out.
 
-- Automate daily `qwen/small`
-- Manual trigger fallback kept available
-- Tracking issue updated on each run
-
-### Phase 2: Multi-profile expansion (target: +2-3 days)
-
-- Add weekly `qwen/auth`
-- Add configurable matrix support in orchestrator
-- Introduce failure categorization (infra vs data vs model quality)
-
-### Phase 3: Hardening (target: +2 days)
+### Phase 3: Hardening (ongoing)
 
 - Add retry policy for transient infra failures
 - Add timeout policies per run class
@@ -115,9 +98,6 @@ If any gate fails:
 - **No pending data but wasted GPU run**
   - Mitigation: conditional merge/run logic, skip policy for empty `data/next`.
 
-## Immediate Next Steps
+## What's next
 
-1. Implement Phase 1 orchestrator skeleton and config file.
-2. Create/initialize tracking issue for recurring run logs.
-3. Run one dry execution path and validate reporting shape.
-4. Enable schedule after first successful manual run.
+Track operational improvements (pause/resume, richer summaries, Hub artifacts) in issues and in [`scripts/hf/README.md`](../scripts/hf/README.md). For a new automation surface, extend `recurring_runner.py` / `configs/recurring_runs.json` so training behavior stays on `scripts/pipeline.py`.
