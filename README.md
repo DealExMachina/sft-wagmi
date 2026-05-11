@@ -109,7 +109,7 @@ python3 eval_sft.py && python3 eval_sft_rag.py && python3 eval_redteam.py
 
 ## Cursor SDK recurring automations
 
-The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration.
+The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration. Space-side / HF Jobs behaviour, `recurring_runner.py`, and **`configs/recurring_runs.json`** are documented in [`scripts/hf/README.md`](scripts/hf/README.md). Cadence and scope notes live in [`docs/RECURRING_TRAINING_PLAN.md`](docs/RECURRING_TRAINING_PLAN.md).
 
 ```bash
 cd automation/cursor-sdk
@@ -123,12 +123,14 @@ CURSOR_API_KEY=... npm run run:housekeeper
 CURSOR_API_KEY=... npm run run:housekeeper -- --area docs --instruction "focus on stale runbooks first"
 ```
 
-Recurring training orchestrator trigger:
+Recurring training orchestrator trigger (optional **`--config`**, path relative to repo root; default **`configs/recurring_runs.json`**):
 
 ```bash
 CURSOR_API_KEY=... npm run run:recurring -- --cadence daily --trigger scheduler
 CURSOR_API_KEY=... npm run run:recurring -- --cadence weekly --trigger scheduler
 ```
+
+GitHub Actions: [`.github/workflows/recurring-training-cursor-sdk.yml`](.github/workflows/recurring-training-cursor-sdk.yml).
 
 Suggested cron shape (outside repo):
 
@@ -200,7 +202,7 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
 ```text
 sft-wagmi/
 ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
-├── docs/                 HF model-card runbook (AI Act)
+├── docs/                 HF model-card runbook; recurring-training overview (`RECURRING_TRAINING_PLAN.md`)
 ├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
 │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
 ├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py

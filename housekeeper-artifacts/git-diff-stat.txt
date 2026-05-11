@@ -1,0 +1,6 @@
+ README.md                       |   8 ++-
+ docs/RECURRING_TRAINING_PLAN.md | 133 +++++++---------------------------------
+ eval_redteam.py                 |   4 +-
+ scripts/hf/README.md            |   7 ++-
+ scripts/pipeline.py             |  20 +++---
+ 5 files changed, 42 insertions(+), 130 deletions(-)

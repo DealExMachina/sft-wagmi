@@ -1,0 +1,33 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area .
+
+## 1) Files changed
+
+| File | Change |
+|------|--------|
+| `README.md` | Cursor SDK section now points at `scripts/hf/README.md`, `docs/RECURRING_TRAINING_PLAN.md`, optional `--config` for `run:recurring`, and the recurring GitHub Actions workflow; repo layout line under `docs/` updated. |
+| `docs/RECURRING_TRAINING_PLAN.md` | Replaced the old “planned deliverables” content with an overview that matches what’s implemented, links canonical paths, explains **`pipeline_flags`** vs **`pipeline.py --all`**, keeps constraints/gates/backlog briefly. |
+| `scripts/hf/README.md` | Corrected **`eval_openai_compat.py`** link, LFM red-team line to **`LiquidAI/LFM2-24B-A2B`** (aligned with `config.py`), dropped “Phase 2” wording, documented **`pipeline_flags`** vs **`--all`**. |
+| `scripts/pipeline.py` | Module docstring updated so the **`--all`** flow (preflight → merge-no-op → train → eval + eval-rag → redteam → export) matches the code and optional stages are spelled out clearly. |
+| `eval_redteam.py` | Comment for the LFM2 auth loader no longer cites the wrong baseline size; wording matches **`config.py`**. |
+
+No files removed: `RECURRING_TRAINING_PLAN.md` was obsolete as a backlog spec but still useful as a short index beside the runbook; it’s now rewritten instead of deleted so inbound links (`README`) stay meaningful without duplicating the long operational text.
+
+---
+
+## 2) Why each change was needed
+
+- **README**: Central index should send readers to the real recurring-training runbook and note the **`--config`** flag the TypeScript launcher already supports (`run-recurring.ts`).
+- **`docs/RECURRING_TRAINING_PLAN.md`**: It still described work that exists today (`recurring_runner.py`, `configs/recurring_runs.json`, `scripts/hf/README.md`) as “minimum deliverables” and understated pipeline steps—the biggest source of stale duplication.
+- **`scripts/hf/README.md`**: The **`eval_openai_compat`** link pointed at `scripts/` instead of repo root; the LFM2 auth baseline was inconsistent with **`config.resolve_profile_config`**; recurring config needed explicit comparison to **`--all`**.
+- **`pipeline.py` docstring**: It listed **`baseline`/autotune** in what looked like default flow; **`--all`** does not include them—the docstring contradicted **`argparse`** and the implementation.
+- **`eval_redteam.py`**: Inline comment wrongly named **LFM2-8B-A1B** while **`BASE_MODEL_ID`** comes from **`config.py`** (**24B-A2B**).
+
+---
+
+## 3) Follow-up manual actions
+
+- If scheduled runs must match interactive **`pipeline.py --all`**, extend **`configs/recurring_runs.json`** **`pipeline_flags`** with **`--eval-rag`** (and **`--eval-tools`** if required) after reviewing runtime cost on HF Jobs.
+- Confirm **`DealExMachina/sft-wagmi` issue `#2`** in **`configs/recurring_runs.json`** is still the intended tracking issue for recurring comments (`gh`/`GITHUB_TOKEN` path).
+- Decide whether **`automation/cursor-sdk/node_modules/`** should stay untracked (recommended: use **`npm ci`**/`npm install` in CI locally and **`gitignore`** `node_modules` if it isn’t already—out of scope for this doc sweep).

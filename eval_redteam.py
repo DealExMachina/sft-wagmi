@@ -148,8 +148,8 @@ def run() -> dict:
             )
             FastLanguageModel.for_inference(model)
         elif MODEL_PROFILE == "auth" and LLM_FAMILY == "lfm2":
-            # LFM2-8B-A1B uses custom_code (MoE architecture); load via vanilla PEFT
-            # with trust_remote_code=True and 4-bit bitsandbytes quantization.
+            # LFM2 MoE bases use custom_code; load via vanilla PEFT with
+            # trust_remote_code=True and 4-bit bitsandbytes quantization.
             from peft import PeftModel
             from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
