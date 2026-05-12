@@ -1,123 +1,50 @@
-# Recurring Training Plan (Cursor Agents + HF ml-intern)
+# Recurring training (design notes)
+
+**Implemented.** Operational steps, Cursor SDK launchers, and reporting live in:
+
+- [`scripts/hf/README.md`](../scripts/hf/README.md)
+- [`configs/recurring_runs.json`](../configs/recurring_runs.json)
+- [`.github/workflows/recurring-training-cursor-sdk.yml`](../.github/workflows/recurring-training-cursor-sdk.yml)
+- [`automation/cursor-sdk/README.md`](../automation/cursor-sdk/README.md)
+
+This file keeps the original intent and gates; it does not duplicate command examples from the README above.
 
 ## Objective
 
-Run `sft-wagmi` training on a regular cadence with:
-
-- Cursor agents as orchestration/control plane
-- Hugging Face infrastructure (`ml-intern` target) as execution plane
-- Clear release gates (`eval`, `redteam`) and auditable outcomes
+Run `sft-wagmi` on a **daily** (lighter) and **weekly** (heavier) cadence using Hugging Face GPU jobs as the execution plane and Cursor agents / GitHub Actions as the control plane, with auditable outcomes.
 
 ## Constraints
 
-- Training and heavy evaluation execute remotely on Hugging Face, not on local workstation.
-- Job outputs are ephemeral unless explicitly persisted to the Hub or another durable store.
-- Existing repo entrypoint remains `scripts/pipeline.py` to avoid divergence in training behavior.
+- Heavy training and evaluation run remotely (HF Jobs / Space image), not on a laptop.
+- Job stdout and local disks are ephemeral unless artifacts are pushed to the Hub or logged (e.g. issue comments).
+- Pipeline behavior stays anchored on **`scripts/pipeline.py`** and flags defined there.
 
-## Target Operating Model
+## Operating model
 
-1. Cursor scheduled agent starts a run.
-2. Agent determines run type (daily light vs weekly heavy).
-3. Agent submits remote HF execution with required secrets.
-4. Remote job runs `scripts/pipeline.py` with profile/family flags.
-5. Agent collects outcome signals (success, metrics, redteam status, artifact refs).
-6. Agent updates a tracking issue and flags failures for human review.
+1. Scheduler or manual trigger starts the Cursor SDK recurring launcher (or `recurring_runner.py` in a Space shell).
+2. `recurring_runner.py` expands the matrix from `configs/recurring_runs.json`, optionally skips empty `data/next/`, submits HF Jobs or runs locally per `backend`.
+3. Success requires stage exits consistent with configured gates (train, eval, redteam, export as configured).
+4. Outcomes roll up to the configured GitHub issue when `gh` + token are available.
 
-## Cadence
+## Configured cadence (current defaults)
 
-### Daily (light)
+See `configs/recurring_runs.json` for the source of truth. At a glance:
 
-- `qwen/small`
-- Steps:
-  - `--preflight`
-  - optional `--sync-dataset`
-  - conditional `--merge-next`
-  - `--train --eval --redteam --export-merged`
+| Run id | Cadence | Matrix | Notes |
+| --- | --- | --- | --- |
+| `daily-qwen-small` | daily | `qwen` / `small` | `skip_if_no_pending_data`; `merge_next: auto`; HF Jobs backend |
+| `weekly-qwen-auth` | weekly | `qwen` / `auth` | Longer timeout; stricter `continue_on_failure` |
+| `weekly-lfm2-auth` | weekly | `lfm2` / `auth` | Present but **disabled** by default (`enabled: false`) |
 
-### Weekly (heavy)
+Pipeline flags in config focus on `--train`, `--eval`, `--redteam`, `--export-merged` plus dataset sync / merge behavior per run — not necessarily the full local `--all` graph.
 
-- `qwen/auth` (+ optionally `lfm2/auth` once stable)
-- Same steps as daily, with longer timeout and stricter post-run checks.
+## Release gates
 
-## Minimum Technical Deliverables
+Treat a run as successful only when configured stages complete with exit code `0` and expected artifacts exist (merged weights on Hub where export is enabled). On failure: record stage, excerpt, and avoid promoting the build as a release candidate.
 
-1. **Orchestrator script**
-   - Add `scripts/hf/recurring_runner.py` (or similar) that:
-     - builds run matrix
-     - submits HF run commands
-     - records job IDs/URLs
-     - formats run summary payload
+## Risks (concise)
 
-2. **Run profile config**
-   - Add `configs/recurring_runs.json` (or env-driven equivalent) with:
-     - cadence
-     - family/profile
-     - timeout
-     - optional step flags
-
-3. **Issue reporting template**
-   - Add issue body/comment template for:
-     - run date + trigger
-     - job URL
-     - pipeline command
-     - pass/fail gates
-     - links to reports/model artifacts
-
-4. **Operational runbook**
-   - Expand `scripts/hf/README.md` with:
-     - how scheduler triggers agent
-     - how to pause/resume
-     - how to retry failed runs
-
-## Release Gates
-
-A run is considered successful only if:
-
-- training exits with code `0`
-- `eval` completes
-- `redteam` completes with acceptable threshold
-- `export-merged` completes and target Hub repo receives the expected artifact
-
-If any gate fails:
-
-- mark run as failed
-- include failing stage and key log excerpt in issue update
-- do not mark model as release candidate
-
-## Phase Plan
-
-### Phase 1: Single-path automation (target: 1-2 days)
-
-- Automate daily `qwen/small`
-- Manual trigger fallback kept available
-- Tracking issue updated on each run
-
-### Phase 2: Multi-profile expansion (target: +2-3 days)
-
-- Add weekly `qwen/auth`
-- Add configurable matrix support in orchestrator
-- Introduce failure categorization (infra vs data vs model quality)
-
-### Phase 3: Hardening (target: +2 days)
-
-- Add retry policy for transient infra failures
-- Add timeout policies per run class
-- Add post-run summary artifact in-repo or Hub dataset
-
-## Risks and Mitigations
-
-- **OOM or timeout on auth profile**
-  - Mitigation: profile-specific timeouts, lower seq length fallback, staged retries.
-- **Missing secret/token**
-  - Mitigation: preflight secret validation before remote submit.
-- **False-positive success (partial pipeline)**
-  - Mitigation: explicit stage-level success checks and gate evaluation.
-- **No pending data but wasted GPU run**
-  - Mitigation: conditional merge/run logic, skip policy for empty `data/next`.
-
-## Immediate Next Steps
-
-1. Implement Phase 1 orchestrator skeleton and config file.
-2. Create/initialize tracking issue for recurring run logs.
-3. Run one dry execution path and validate reporting shape.
-4. Enable schedule after first successful manual run.
+- **OOM / timeout** on auth or large-seq runs — mitigate with timeouts, seq caps (`AUTH_MAX_SEQ_LEN` in config), and staged retries.
+- **Missing secrets** — validate in preflight before submitting remote jobs.
+- **False success** — rely on explicit per-stage checks in the runner, not a single blanket exit code from partial work.
+- **Empty `data/next/`** — use `skip_if_no_pending_data` on light cadences to avoid pointless GPU use.

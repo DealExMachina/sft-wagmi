@@ -5,8 +5,8 @@ to data/train.jsonl (with a configurable eval split), updates metadata.json,
 and optionally bumps VERSION.
 
 Usage:
-    python3 scripts/merge_next.py                # merge + bump patch
-    python3 scripts/merge_next.py --bump minor   # merge + bump minor
+    python3 scripts/merge_next.py                # merge + bump minor (default --bump)
+    python3 scripts/merge_next.py --bump patch   # merge + bump patch only
     python3 scripts/merge_next.py --dry-run      # preview without writing
 """
 

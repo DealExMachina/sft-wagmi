@@ -20,8 +20,9 @@ npm install
     - update stale docs and README sections
     - remove clearly redundant documents
     - keep references consistent after edits/deletions
-- `npm run run:recurring -- --cadence daily|weekly`
-  - Triggers the existing recurring training runner through a Cursor agent.
+- `npm run run:recurring -- --cadence daily|weekly [--trigger <label>] [--config path/to/recurring_runs.json]`
+  - Default `--trigger` is `cursor-sdk`; GitHub Actions passes `--trigger github-actions:<run_id>`.
+  - Default `--config` is `configs/recurring_runs.json` (repo root).
 
 ## HouseKeeper flags
 
@@ -47,3 +48,5 @@ Use cron (or any scheduler) from this directory:
 For unattended runs, direct output to a log file and review diffs before commit.
 
 GitHub Actions schedule is provided in `.github/workflows/housekeeper-cursor-sdk.yml`.
+
+Recurring training trigger schedule: `.github/workflows/recurring-training-cursor-sdk.yml`.

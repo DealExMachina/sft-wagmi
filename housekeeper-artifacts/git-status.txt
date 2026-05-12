@@ -1,0 +1,6 @@
+ M README.md
+ M automation/cursor-sdk/README.md
+ M docs/RECURRING_TRAINING_PLAN.md
+ M scripts/hf/README.md
+ M scripts/merge_next.py
+?? housekeeper-artifacts/

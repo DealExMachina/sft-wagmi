@@ -1,0 +1,38 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area .
+
+Here is what was done.
+
+---
+
+### 1) Files changed
+
+| File | Change |
+|------|--------|
+| [`README.md`](README.md) | Repository layout line for `docs/`; Compliance section links recurring doc + canonical ops paths |
+| [`docs/RECURRING_TRAINING_PLAN.md`](docs/RECURRING_TRAINING_PLAN.md) | Replaced long “todo plan” with short design notes + pointers + table aligned to `configs/recurring_runs.json` |
+| [`scripts/hf/README.md`](scripts/hf/README.md) | Auth LFM path now matches `config.py` (`LiquidAI/LFM2-24B-A2B`) |
+| [`scripts/merge_next.py`](scripts/merge_next.py) | Module docstring Usage lines match `argparse` default `--bump minor` |
+| [`automation/cursor-sdk/README.md`](automation/cursor-sdk/README.md) | Documented `--trigger` / `--config` for `run:recurring`; linked recurring Actions workflow |
+
+Nothing was deleted: `RECURRING_TRAINING_PLAN.md` was **compressed** so it no longer duplicates operational docs or lists obsolete deliverables.
+
+---
+
+### 2) Why each change was needed
+
+- **`scripts/hf/README.md`** — Still described the old LFM2 auth base (`LFM2-8B-A1B`); [`config.py`](config.py) uses `LiquidAI/LFM2-24B-A2B` for `lfm2` / `auth`.
+- **`docs/RECURRING_TRAINING_PLAN.md`** — Most of the file was a phased backlog (“add orchestrator”, “immediate next steps”) that is already implemented; that duplicated [`scripts/hf/README.md`](scripts/hf/README.md) and invited drift (e.g. daily runs listing `--preflight` while [`configs/recurring_runs.json`](configs/recurring_runs.json) uses explicit `pipeline_flags`).
+- **`README.md`** — Layout only mentioned the AI Act runbook; `docs/` also holds the recurring design note. Compliance now points readers to the runbook, the slim plan doc, and the real entrypoints (`scripts/hf/README`, `configs/recurring_runs.json`).
+- **`scripts/merge_next.py`** — Docstring said default bump was **patch** while `parser.add_argument(..., default="minor")` says **minor**; aligned docstring with code.
+- **`automation/cursor-sdk/README.md`** — [`run-recurring.ts`](automation/cursor-sdk/src/run-recurring.ts) supports `--trigger` and `--config`; Actions uses `github-actions:<run_id>` — documented for parity with the housekeeper workflow note.
+
+---
+
+### 3) Follow-up manual actions
+
+- **Optional:** Historical red-team markdown under `reports/redteam/v0.3.5/` still mentions `LFM2-8B-A1B`; those are run artifacts — update only if you want reports to match today’s config for confusion auditing (not required for correctness of the pipeline).
+- **Optional:** [CHANGELOG `0.3.0`](CHANGELOG.md) still documents the older `LFM2-8B-A1B` auth base; leaving it preserves release history; add a short retrospective note only if you care about readers confused by the timeline.
+
+No commits or pushes were made; no destructive git commands were run.
