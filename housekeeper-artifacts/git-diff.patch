@@ -1,0 +1,262 @@
+diff --git a/README.md b/README.md
+index 63f1b31..817123a 100644
+--- a/README.md
++++ b/README.md
+@@ -54,9 +54,9 @@ python3 scripts/pipeline.py --sync-dataset   # subprocess: npm run dataset:wagmi
+ | [`scripts/pipeline.py`](scripts/pipeline.py) | CLI: loads `.env`, sets `MODEL_PROFILE` / `LLM_FAMILY` for subprocesses. |
+ | [`config.py`](config.py) | `_REGISTRY`, `resolve_profile_config()`; overrides via `SMALL_*` / `AUTH_*` env (see module docstring). |
+ 
+-**`--all`:** `preflight` → `merge-next` (only if `data/next/*.jsonl` exist) → `train` → `eval` → `eval-rag` → `redteam` → `export-merged`. Does not run `baseline`, `autotune`, or `export-gguf` unless requested.
++**`--all`:** `preflight` → `merge-next` (no-op when `data/next/` has no `.jsonl` files) → `train` → `eval` → `eval-rag` → `redteam` → `export-merged`. Does not run `sync-dataset`, `baseline`, `autotune`, `eval-tools`, or `export-gguf` unless requested.
+ 
+-**Flags:** `--profile small|auth`, `--family qwen|lfm2` (defaults from env; **`qwen3`** exists in `config.py` only for direct `python3 train.py` / eval until CLI adds it), `--sync-dataset`, `--merge-next [--bump patch|minor|major]`, `--dry-run`, per-step toggles as in `--help`.
++**Flags:** `--profile small|auth`, `--family qwen|lfm2` (defaults from env; **`qwen3`** exists in `config.py` only for direct `python3 train.py` / eval until CLI adds it), `--sync-dataset`, `--merge-next [--bump patch|minor|major]`, `--dry-run`, and per-step flags including `--eval-tools` (not part of `--all`); see `--help`.
+ 
+ **Artifacts:** large files on Hugging Face Hub, not git ([`.gitignore`](.gitignore)). **Secrets:** `HF_TOKEN` (Hub), `OPENAI_API_KEY` (autotune).
+ 
+@@ -107,35 +107,9 @@ python3 eval_sft.py && python3 eval_sft_rag.py && python3 eval_redteam.py
+ # or: python3 scripts/pipeline.py --all --family lfm2 --profile small
+ ```
+ 
+-## Cursor SDK recurring automations
++## Cursor SDK automations
+ 
+-The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration.
+-
+-```bash
+-cd automation/cursor-sdk
+-npm install
+-```
+-
+-HouseKeeper (docs and README hygiene):
+-
+-```bash
+-CURSOR_API_KEY=... npm run run:housekeeper
+-CURSOR_API_KEY=... npm run run:housekeeper -- --area docs --instruction "focus on stale runbooks first"
+-```
+-
+-Recurring training orchestrator trigger:
+-
+-```bash
+-CURSOR_API_KEY=... npm run run:recurring -- --cadence daily --trigger scheduler
+-CURSOR_API_KEY=... npm run run:recurring -- --cadence weekly --trigger scheduler
+-```
+-
+-Suggested cron shape (outside repo):
+-
+-```bash
+-# nightly docs housekeeping
+-0 2 * * * cd /path/to/sft-wagmi/automation/cursor-sdk && CURSOR_API_KEY=... npm run run:housekeeper -- --area .
+-```
++Local Cursor SDK launchers live in [`automation/cursor-sdk`](automation/cursor-sdk) (HouseKeeper + recurring training trigger). Install with `cd automation/cursor-sdk && npm install`, set `CURSOR_API_KEY`, then `npm run run:housekeeper` / `npm run run:recurring -- --cadence daily|weekly --trigger …`. Full flags, scheduling, and GitHub Actions pointers: [`automation/cursor-sdk/README.md`](automation/cursor-sdk/README.md). Recurring pipeline matrix and HF Jobs behavior: [`scripts/hf/README.md`](scripts/hf/README.md).
+ 
+ ## Autotune
+ 
+@@ -200,7 +174,7 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
+ ```text
+ sft-wagmi/
+ ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
+-├── docs/                 HF model-card runbook (AI Act)
++├── docs/                 HF model-card runbook (AI Act); recurring ops in scripts/hf/README.md
+ ├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
+ │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
+ ├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py
+diff --git a/automation/cursor-sdk/README.md b/automation/cursor-sdk/README.md
+index 2add1b8..e5c3969 100644
+--- a/automation/cursor-sdk/README.md
++++ b/automation/cursor-sdk/README.md
+@@ -23,6 +23,8 @@ npm install
+ - `npm run run:recurring -- --cadence daily|weekly`
+   - Triggers the existing recurring training runner through a Cursor agent.
+ 
++Operational detail (run matrix, `recurring_runner.py`, HF Jobs): [`../../scripts/hf/README.md`](../../scripts/hf/README.md).
++
+ ## HouseKeeper flags
+ 
+ - `--area <path>`
+diff --git a/docs/RECURRING_TRAINING_PLAN.md b/docs/RECURRING_TRAINING_PLAN.md
+deleted file mode 100644
+index 043557c..0000000
+--- a/docs/RECURRING_TRAINING_PLAN.md
++++ /dev/null
+@@ -1,123 +0,0 @@
+-# Recurring Training Plan (Cursor Agents + HF ml-intern)
+-
+-## Objective
+-
+-Run `sft-wagmi` training on a regular cadence with:
+-
+-- Cursor agents as orchestration/control plane
+-- Hugging Face infrastructure (`ml-intern` target) as execution plane
+-- Clear release gates (`eval`, `redteam`) and auditable outcomes
+-
+-## Constraints
+-
+-- Training and heavy evaluation execute remotely on Hugging Face, not on local workstation.
+-- Job outputs are ephemeral unless explicitly persisted to the Hub or another durable store.
+-- Existing repo entrypoint remains `scripts/pipeline.py` to avoid divergence in training behavior.
+-
+-## Target Operating Model
+-
+-1. Cursor scheduled agent starts a run.
+-2. Agent determines run type (daily light vs weekly heavy).
+-3. Agent submits remote HF execution with required secrets.
+-4. Remote job runs `scripts/pipeline.py` with profile/family flags.
+-5. Agent collects outcome signals (success, metrics, redteam status, artifact refs).
+-6. Agent updates a tracking issue and flags failures for human review.
+-
+-## Cadence
+-
+-### Daily (light)
+-
+-- `qwen/small`
+-- Steps:
+-  - `--preflight`
+-  - optional `--sync-dataset`
+-  - conditional `--merge-next`
+-  - `--train --eval --redteam --export-merged`
+-
+-### Weekly (heavy)
+-
+-- `qwen/auth` (+ optionally `lfm2/auth` once stable)
+-- Same steps as daily, with longer timeout and stricter post-run checks.
+-
+-## Minimum Technical Deliverables
+-
+-1. **Orchestrator script**
+-   - Add `scripts/hf/recurring_runner.py` (or similar) that:
+-     - builds run matrix
+-     - submits HF run commands
+-     - records job IDs/URLs
+-     - formats run summary payload
+-
+-2. **Run profile config**
+-   - Add `configs/recurring_runs.json` (or env-driven equivalent) with:
+-     - cadence
+-     - family/profile
+-     - timeout
+-     - optional step flags
+-
+-3. **Issue reporting template**
+-   - Add issue body/comment template for:
+-     - run date + trigger
+-     - job URL
+-     - pipeline command
+-     - pass/fail gates
+-     - links to reports/model artifacts
+-
+-4. **Operational runbook**
+-   - Expand `scripts/hf/README.md` with:
+-     - how scheduler triggers agent
+-     - how to pause/resume
+-     - how to retry failed runs
+-
+-## Release Gates
+-
+-A run is considered successful only if:
+-
+-- training exits with code `0`
+-- `eval` completes
+-- `redteam` completes with acceptable threshold
+-- `export-merged` completes and target Hub repo receives the expected artifact
+-
+-If any gate fails:
+-
+-- mark run as failed
+-- include failing stage and key log excerpt in issue update
+-- do not mark model as release candidate
+-
+-## Phase Plan
+-
+-### Phase 1: Single-path automation (target: 1-2 days)
+-
+-- Automate daily `qwen/small`
+-- Manual trigger fallback kept available
+-- Tracking issue updated on each run
+-
+-### Phase 2: Multi-profile expansion (target: +2-3 days)
+-
+-- Add weekly `qwen/auth`
+-- Add configurable matrix support in orchestrator
+-- Introduce failure categorization (infra vs data vs model quality)
+-
+-### Phase 3: Hardening (target: +2 days)
+-
+-- Add retry policy for transient infra failures
+-- Add timeout policies per run class
+-- Add post-run summary artifact in-repo or Hub dataset
+-
+-## Risks and Mitigations
+-
+-- **OOM or timeout on auth profile**
+-  - Mitigation: profile-specific timeouts, lower seq length fallback, staged retries.
+-- **Missing secret/token**
+-  - Mitigation: preflight secret validation before remote submit.
+-- **False-positive success (partial pipeline)**
+-  - Mitigation: explicit stage-level success checks and gate evaluation.
+-- **No pending data but wasted GPU run**
+-  - Mitigation: conditional merge/run logic, skip policy for empty `data/next`.
+-
+-## Immediate Next Steps
+-
+-1. Implement Phase 1 orchestrator skeleton and config file.
+-2. Create/initialize tracking issue for recurring run logs.
+-3. Run one dry execution path and validate reporting shape.
+-4. Enable schedule after first successful manual run.
+diff --git a/eval_redteam.py b/eval_redteam.py
+index ce97f98..fa51432 100644
+--- a/eval_redteam.py
++++ b/eval_redteam.py
+@@ -148,7 +148,7 @@ def run() -> dict:
+             )
+             FastLanguageModel.for_inference(model)
+         elif MODEL_PROFILE == "auth" and LLM_FAMILY == "lfm2":
+-            # LFM2-8B-A1B uses custom_code (MoE architecture); load via vanilla PEFT
++            # LFM2 MoE (e.g. 24B-A2B in config) uses custom_code; load via vanilla PEFT
+             # with trust_remote_code=True and 4-bit bitsandbytes quantization.
+             from peft import PeftModel
+             from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+diff --git a/scripts/hf/README.md b/scripts/hf/README.md
+index befc91c..1499067 100644
+--- a/scripts/hf/README.md
++++ b/scripts/hf/README.md
+@@ -19,7 +19,7 @@ The Space **Docker** image runs [`app.py`](../../app.py) (Gradio on `app_port` /
+ Runs [`eval_redteam.py`](../../eval_redteam.py) twice (auth profile only):
+ 
+ 1. `LLM_FAMILY=qwen` — Qwen2.5-14B + Wagmi auth adapter (local `output/...` or Hub id from `config.py`).
+-2. `LLM_FAMILY=lfm2` — LFM2-8B-A1B + Wagmi LFM2 auth adapter.
++2. `LLM_FAMILY=lfm2` — `LiquidAI/LFM2-24B-A2B` (registry default) + Wagmi LFM2 auth adapter.
+ 
+ Requires **CUDA** (e.g. L40 on the Space). Set `HF_TOKEN` if `FastLanguageModel.from_pretrained` must pull a private adapter.
+ 
+diff --git a/scripts/pipeline.py b/scripts/pipeline.py
+index b6444fb..eaa6a34 100644
+--- a/scripts/pipeline.py
++++ b/scripts/pipeline.py
+@@ -1,15 +1,16 @@
+ """One-command launcher for the sft-wagmi pipeline.
+ 
+-Workflow:
+-  1) optional dataset sync from dexm-one-page
+-  2) optional merge data/next/ into training set (bump version)
+-  3) baseline.py
+-  4) train.py
+-  5) autotune.py (requires OPENAI_API_KEY)
+-  6) eval_sft.py / eval_sft_rag.py / eval_tool_calls.py
+-  7) eval_redteam.py (versioned guardrail red-team report)
+-  8) export_merged.py (push merged model to Hub)
+-  9) local GGUF conversion (scripts/local_gguf_export.sh — manual)
++Steps are selected with explicit flags or with `--all`. Available steps:
++`preflight`, dataset `sync-dataset`, `merge-next` (bumps VERSION when
++`data/next/*.jsonl` exist), `baseline`, `train`, `autotune` (needs
++`OPENAI_API_KEY`), `eval`, `eval-rag`, `eval-tools`, `redteam`,
++`export-merged`, `export-gguf`.
++
++`--all` enables: preflight → merge-next → train → eval → eval-rag → redteam →
++export-merged. It does **not** run `sync-dataset`, `baseline`, `autotune`,
++`eval-tools`, or `export-gguf` unless those flags are added.
++
++Local GGUF after Hub export: `scripts/local_gguf_export.sh` (manual).
+ 
+ Usage:
+   python3 scripts/pipeline.py --all --profile auth

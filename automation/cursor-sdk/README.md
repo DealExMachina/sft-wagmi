@@ -23,6 +23,8 @@ npm install
 - `npm run run:recurring -- --cadence daily|weekly`
   - Triggers the existing recurring training runner through a Cursor agent.
 
+Operational detail (run matrix, `recurring_runner.py`, HF Jobs): [`../../scripts/hf/README.md`](../../scripts/hf/README.md).
+
 ## HouseKeeper flags
 
 - `--area <path>`
