@@ -1,0 +1,26 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area .
+
+## 1) Files changed
+
+| File | Action |
+|------|--------|
+| `docs/RECURRING_TRAINING_PLAN.md` | **Deleted** |
+| `README.md` | **Updated** (DPO/GRPO, recurring-run pointers, repo layout) |
+| `scripts/hf/README.md` | **Updated** (heading + LFM2 auth wording; see note below) |
+| `eval_redteam.py` | **Updated** (comment only: LFM2 auth model id) |
+
+## 2) Why each change was needed
+
+- **`docs/RECURRING_TRAINING_PLAN.md` removed:** It described future work (“add `recurring_runner.py`”, phased plan) that is already implemented (`scripts/hf/recurring_runner.py`, `configs/recurring_runs.json`, `scripts/hf/README.md`, Cursor SDK + GHA). Keeping it duplicated the runbook and implied the wrong project state. No in-repo references pointed at this file.
+- **`README.md`:** Added a short **DPO / GRPO** section so the top-level doc matches `train_dpo.py`, `train_grpo.py`, `data/dpo/`, Gradio tab **7c**, and `CHANGELOG` 0.3.5 — and clarified that these steps are outside `pipeline.py --all`. Linked **recurring training** to `scripts/hf/README.md` and `.github/workflows/recurring-training-cursor-sdk.yml` so the README matches how automation actually runs. **Repository layout** now lists `train_dpo.py` / `train_grpo.py`, `hf/recurring_runner.py`, and links the docs runbook by filename.
+- **`scripts/hf/README.md`:** Renamed “Recurring runner (Phase 2)” to **Recurring runner** now that it is live. The auth LFM2 red-team line is aligned with `config.py` (**LFM2-24B-A2B**).
+- **`eval_redteam.py`:** Comment for the `lfm2` auth branch referred to **LFM2-8B-A1B** while `BASE_MODEL_ID` comes from `config.py` as **LiquidAI/LFM2-24B-A2B** — updated the comment to match behavior.
+
+## 3) Follow-up manual actions
+
+- **External bookmarks:** If anything outside the repo (wiki, issues, Notion) linked to `docs/RECURRING_TRAINING_PLAN.md`, point those links to [`scripts/hf/README.md`](scripts/hf/README.md) instead.
+- **Optional:** Run the housekeeper or a quick doc review after the next training/automation change so `configs/recurring_runs.json` and `scripts/hf/README.md` stay in sync (no code change required now).
+
+No commit or push was performed, per your instructions.

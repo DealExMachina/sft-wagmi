@@ -92,6 +92,10 @@ LLM_FAMILY=lfm2 MODEL_PROFILE=auth python3 train.py
 
 **Generation (eval / autotune / baseline):** `config.resolve_generation_kwargs()`: for `lfm2`, defaults are sampling-style (`temperature`, `top_p`, `top_k`, `repetition_penalty`); for `qwen` / `qwen3`, greedy unless env overrides. Env: `SMALL_TEMPERATURE`, `SMALL_TOP_P`, `SMALL_TOP_K`, `AUTH_*` analogues; `SMALL_TEMPERATURE=0` forces greedy LFM2. Training LR tweaks: use `SMALL_LEARNING_RATE` etc.; eval/train checkpoint selection stays in `train.py` / `retrain_step.py`.
 
+## DPO / GRPO (auth Qwen 14B)
+
+**DPO:** optional safety alignment after SFT via `train_dpo.py` and preference pairs in `data/dpo/wagmi_safety_dpo.jsonl` (build/refresh with `python3 scripts/build_dpo_dataset.py`). Merge-and-push the DPO adapter with `export_merged.py` or Gradio tab **7c. Export Merged (DPO)**. **GRPO:** second-phase path in `train_grpo.py` if DPO is insufficient. Hub IDs and local GGUF export profile `auth-dpo` are recorded in [`CHANGELOG.md`](CHANGELOG.md) (0.3.5). These paths are **not** wired into `scripts/pipeline.py --all`; run them from the Space UI or explicitly.
+
 ## Hugging Face Space
 
 **App:** [spaces/jeanbaptdzd/sft-wagmi](https://huggingface.co/spaces/jeanbaptdzd/sft-wagmi) (Gradio on port 7860). Git remote for pushes: `https://huggingface.co/spaces/jeanbaptdzd/sft-wagmi`. If the Space is **private**, unauthenticated HTTP checks return 401; open it while logged into Hugging Face.
@@ -129,6 +133,8 @@ Recurring training orchestrator trigger:
 CURSOR_API_KEY=... npm run run:recurring -- --cadence daily --trigger scheduler
 CURSOR_API_KEY=... npm run run:recurring -- --cadence weekly --trigger scheduler
 ```
+
+Run matrix, HF Jobs backend, reporting, and the GitHub Actions schedule are documented in [`scripts/hf/README.md`](scripts/hf/README.md) (workflow: [`.github/workflows/recurring-training-cursor-sdk.yml`](.github/workflows/recurring-training-cursor-sdk.yml)).
 
 Suggested cron shape (outside repo):
 
@@ -200,10 +206,10 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
 ```text
 sft-wagmi/
 ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
-├── docs/                 HF model-card runbook (AI Act)
-├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
+├── docs/                 [`HF_MODEL_CARD_AI_ACT_RUNBOOK.md`](docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md)
+├── scripts/              pipeline.py, merge_next.py, hf/recurring_runner.py, export_ollama.py, local_gguf_export.sh,
 │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
-├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py
+├── train.py, train_dpo.py, train_grpo.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py
 ├── Dockerfile, docker-entrypoint.sh, requirements.txt, VERSION, CHANGELOG.md
 └── reports/redteam/
 ```
