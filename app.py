@@ -324,6 +324,13 @@ def _terminate_stale_listeners(port: int) -> None:
             pass
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
 with gr.Blocks(title="sft-wagmi") as demo:
     gr.Markdown(f"# sft-wagmi v{get_version()}")
     gr.Markdown(f"**GPU:** {gpu_info()}")
@@ -487,19 +494,40 @@ if __name__ == "__main__":
         f"(align README app_port; override with GRADIO_SERVER_PORT / PORT)",
         flush=True,
     )
-    if not _wait_until_port_free(listen_port, host=listen_host):
+    port_wait_s = float(os.environ.get("GRADIO_PORT_WAIT_SECONDS", "180"))
+    allow_kill_stale = _env_bool("GRADIO_KILL_STALE_LISTENERS", False)
+    passive_on_busy = _env_bool("GRADIO_PASSIVE_ON_PORT_BUSY", True)
+
+    if not _wait_until_port_free(listen_port, host=listen_host, timeout_s=port_wait_s):
         print(
-            f"Port {listen_port} still busy after initial wait; attempting stale-listener cleanup.",
+            f"Port {listen_port} still busy after waiting {port_wait_s:.0f}s.",
             flush=True,
         )
-        _terminate_stale_listeners(listen_port)
-        if not _wait_until_port_free(listen_port, host=listen_host, timeout_s=20.0):
-            raise SystemExit(
-                f"Port {listen_port} is still in use (cannot bind Gradio).\n"
-                "• **Normal Docker Space:** restart or factory-rebuild; keep README app_port 7860 in sync with this bind.\n"
-                "• **Spaces Dev Mode:** if another process already holds 7860, set GRADIO_SERVER_PORT to a free port (e.g. 7861) in the dev environment and refresh.\n"
-                "• **Eval / SFT / red team:** run in a shell, not through Gradio — e.g. "
-                "cd /app && ./scripts/hf/run_redteam_auth_l40.sh  or  "
-                "LLM_FAMILY=qwen MODEL_PROFILE=auth python3 eval_redteam.py\n"
+        if allow_kill_stale:
+            print(
+                f"GRADIO_KILL_STALE_LISTENERS=1: attempting stale-listener cleanup on port {listen_port}.",
+                flush=True,
             )
+            _terminate_stale_listeners(listen_port)
+            if not _wait_until_port_free(listen_port, host=listen_host, timeout_s=30.0):
+                print(f"Port {listen_port} still busy after cleanup attempt.", flush=True)
+
+    if not _wait_until_port_free(listen_port, host=listen_host, timeout_s=2.0):
+        busy_msg = (
+            f"Port {listen_port} is still in use (cannot bind Gradio).\n"
+            "• **Normal Docker Space:** restart or factory-rebuild; keep README app_port 7860 in sync with this bind.\n"
+            "• **Spaces Dev Mode:** if another process already holds 7860, set GRADIO_SERVER_PORT to a free port (e.g. 7861) in the dev environment and refresh.\n"
+            "• **Eval / SFT / red team:** run in a shell, not through Gradio — e.g. "
+            "cd /app && ./scripts/hf/run_redteam_auth_l40.sh  or  "
+            "LLM_FAMILY=qwen MODEL_PROFILE=auth python3 eval_redteam.py\n"
+        )
+        if not passive_on_busy:
+            raise SystemExit(busy_msg)
+        print(busy_msg, flush=True)
+        print(
+            "GRADIO_PASSIVE_ON_PORT_BUSY=1: entering passive hold to avoid Space restart loops.",
+            flush=True,
+        )
+        while True:
+            time.sleep(60)
     demo.queue().launch(server_name=listen_host, server_port=listen_port)
