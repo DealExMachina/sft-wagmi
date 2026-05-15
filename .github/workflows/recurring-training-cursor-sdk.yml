@@ -11,11 +11,6 @@ on:
         options:
           - daily
           - weekly
-  schedule:
-    # Daily run (06:15 UTC)
-    - cron: "15 6 * * *"
-    # Weekly run every Monday (06:45 UTC)
-    - cron: "45 6 * * 1"
 
 jobs:
   recurring:
@@ -51,16 +46,7 @@ jobs:
         id: cadence
         shell: bash
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "value=${{ inputs.cadence }}" >> "$GITHUB_OUTPUT"
-          else
-            now_dow="$(date -u +%u)"
-            if [[ "$now_dow" == "1" ]]; then
-              echo "value=weekly" >> "$GITHUB_OUTPUT"
-            else
-              echo "value=daily" >> "$GITHUB_OUTPUT"
-            fi
-          fi
+          echo "value=${{ inputs.cadence }}" >> "$GITHUB_OUTPUT"
 
       - name: Trigger recurring runner via Cursor SDK
         working-directory: automation/cursor-sdk
