@@ -1,0 +1,38 @@
+---
+description: Always work on a feature branch, never commit directly to main
+alwaysApply: true
+---
+
+# Git Branch Workflow
+
+Multiple agents work in parallel on this repo. Never commit or push directly to `main`.
+
+## Before any commit
+
+1. Check current branch: `git branch --show-current`
+2. If on `main`, create and switch to a topic branch first:
+   ```bash
+   git checkout -b <type>/<short-description>
+   # e.g. fix/chat-mobile-overflow, feat/blog-tags, chore/deps-update
+   ```
+
+## Branch naming
+
+`<type>/<kebab-description>` — keep it under 40 chars.
+Types: `feat`, `fix`, `chore`, `refactor`, `docs`.
+
+## Committing
+
+- Stage only files relevant to the current task.
+- Commit on the topic branch, then push with `-u`:
+  ```bash
+  git push -u origin HEAD
+  ```
+
+## Never
+
+- `git push origin main` (direct push to main)
+- `git commit` while on `main`
+- Force-push without explicit user request
+- Delete `dev` or `main` branches (local or remote)
+- Delete Supabase `dev` or `main` branches/environments (including via MCP/CLI/dashboard actions)
