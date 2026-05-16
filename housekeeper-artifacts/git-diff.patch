@@ -1,0 +1,192 @@
+diff --git a/README.md b/README.md
+index 63f1b31..721eb1d 100644
+--- a/README.md
++++ b/README.md
+@@ -96,7 +96,7 @@ LLM_FAMILY=lfm2 MODEL_PROFILE=auth python3 train.py
+ 
+ **App:** [spaces/jeanbaptdzd/sft-wagmi](https://huggingface.co/spaces/jeanbaptdzd/sft-wagmi) (Gradio on port 7860). Git remote for pushes: `https://huggingface.co/spaces/jeanbaptdzd/sft-wagmi`. If the Space is **private**, unauthenticated HTTP checks return 401; open it while logged into Hugging Face.
+ 
+-After a git push to the Space branch, use a **factory rebuild** (not only Restart) so the image includes the current tree and `/app/VERSION` matches [`VERSION`](VERSION). Verify with `cat /app/VERSION` over SSH or logs. Optional: `bash scripts/hf_space_self_check.sh` from repo root.
++After a git push to the Space branch, use a **factory rebuild** (not only Restart) so the image includes the current tree and `/app/VERSION` matches [`VERSION`](VERSION). Verify with `cat /app/VERSION` over SSH or logs. Optional: `bash scripts/hf_space_self_check.sh` from repo root. Shell runbook (recurring training, `hf jobs`, red-team helpers): [`scripts/hf/README.md`](scripts/hf/README.md).
+ 
+ **LFM2 small (1.2B Instruct), sequential commands:**
+ 
+@@ -200,7 +200,7 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
+ ```text
+ sft-wagmi/
+ ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
+-├── docs/                 HF model-card runbook (AI Act)
++├── docs/                 HF model-card runbook (AI Act); see also scripts/hf/README.md for Space ops
+ ├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
+ │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
+ ├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py
+diff --git a/docs/RECURRING_TRAINING_PLAN.md b/docs/RECURRING_TRAINING_PLAN.md
+deleted file mode 100644
+index 043557c..0000000
+--- a/docs/RECURRING_TRAINING_PLAN.md
++++ /dev/null
+@@ -1,123 +0,0 @@
+-# Recurring Training Plan (Cursor Agents + HF ml-intern)
+-
+-## Objective
+-
+-Run `sft-wagmi` training on a regular cadence with:
+-
+-- Cursor agents as orchestration/control plane
+-- Hugging Face infrastructure (`ml-intern` target) as execution plane
+-- Clear release gates (`eval`, `redteam`) and auditable outcomes
+-
+-## Constraints
+-
+-- Training and heavy evaluation execute remotely on Hugging Face, not on local workstation.
+-- Job outputs are ephemeral unless explicitly persisted to the Hub or another durable store.
+-- Existing repo entrypoint remains `scripts/pipeline.py` to avoid divergence in training behavior.
+-
+-## Target Operating Model
+-
+-1. Cursor scheduled agent starts a run.
+-2. Agent determines run type (daily light vs weekly heavy).
+-3. Agent submits remote HF execution with required secrets.
+-4. Remote job runs `scripts/pipeline.py` with profile/family flags.
+-5. Agent collects outcome signals (success, metrics, redteam status, artifact refs).
+-6. Agent updates a tracking issue and flags failures for human review.
+-
+-## Cadence
+-
+-### Daily (light)
+-
+-- `qwen/small`
+-- Steps:
+-  - `--preflight`
+-  - optional `--sync-dataset`
+-  - conditional `--merge-next`
+-  - `--train --eval --redteam --export-merged`
+-
+-### Weekly (heavy)
+-
+-- `qwen/auth` (+ optionally `lfm2/auth` once stable)
+-- Same steps as daily, with longer timeout and stricter post-run checks.
+-
+-## Minimum Technical Deliverables
+-
+-1. **Orchestrator script**
+-   - Add `scripts/hf/recurring_runner.py` (or similar) that:
+-     - builds run matrix
+-     - submits HF run commands
+-     - records job IDs/URLs
+-     - formats run summary payload
+-
+-2. **Run profile config**
+-   - Add `configs/recurring_runs.json` (or env-driven equivalent) with:
+-     - cadence
+-     - family/profile
+-     - timeout
+-     - optional step flags
+-
+-3. **Issue reporting template**
+-   - Add issue body/comment template for:
+-     - run date + trigger
+-     - job URL
+-     - pipeline command
+-     - pass/fail gates
+-     - links to reports/model artifacts
+-
+-4. **Operational runbook**
+-   - Expand `scripts/hf/README.md` with:
+-     - how scheduler triggers agent
+-     - how to pause/resume
+-     - how to retry failed runs
+-
+-## Release Gates
+-
+-A run is considered successful only if:
+-
+-- training exits with code `0`
+-- `eval` completes
+-- `redteam` completes with acceptable threshold
+-- `export-merged` completes and target Hub repo receives the expected artifact
+-
+-If any gate fails:
+-
+-- mark run as failed
+-- include failing stage and key log excerpt in issue update
+-- do not mark model as release candidate
+-
+-## Phase Plan
+-
+-### Phase 1: Single-path automation (target: 1-2 days)
+-
+-- Automate daily `qwen/small`
+-- Manual trigger fallback kept available
+-- Tracking issue updated on each run
+-
+-### Phase 2: Multi-profile expansion (target: +2-3 days)
+-
+-- Add weekly `qwen/auth`
+-- Add configurable matrix support in orchestrator
+-- Introduce failure categorization (infra vs data vs model quality)
+-
+-### Phase 3: Hardening (target: +2 days)
+-
+-- Add retry policy for transient infra failures
+-- Add timeout policies per run class
+-- Add post-run summary artifact in-repo or Hub dataset
+-
+-## Risks and Mitigations
+-
+-- **OOM or timeout on auth profile**
+-  - Mitigation: profile-specific timeouts, lower seq length fallback, staged retries.
+-- **Missing secret/token**
+-  - Mitigation: preflight secret validation before remote submit.
+-- **False-positive success (partial pipeline)**
+-  - Mitigation: explicit stage-level success checks and gate evaluation.
+-- **No pending data but wasted GPU run**
+-  - Mitigation: conditional merge/run logic, skip policy for empty `data/next`.
+-
+-## Immediate Next Steps
+-
+-1. Implement Phase 1 orchestrator skeleton and config file.
+-2. Create/initialize tracking issue for recurring run logs.
+-3. Run one dry execution path and validate reporting shape.
+-4. Enable schedule after first successful manual run.
+diff --git a/reports/redteam/README.md b/reports/redteam/README.md
+index 0539ee1..24f6e3f 100644
+--- a/reports/redteam/README.md
++++ b/reports/redteam/README.md
+@@ -6,4 +6,4 @@ Naming: `reports/redteam/v<VERSION>/<profile>_redteam_<YYYYMMDD-HHMMSS>.{json,md
+ 
+ To generate **auth** reports for **Qwen 14B** and **LFM2** on a Hugging Face L40 Space, run:
+ 
+-[`scripts/hf/run_redteam_auth_l40.sh`](../scripts/hf/run_redteam_auth_l40.sh)
++[`scripts/hf/run_redteam_auth_l40.sh`](../../scripts/hf/run_redteam_auth_l40.sh)
+diff --git a/scripts/hf/README.md b/scripts/hf/README.md
+index befc91c..0037023 100644
+--- a/scripts/hf/README.md
++++ b/scripts/hf/README.md
+@@ -19,7 +19,7 @@ The Space **Docker** image runs [`app.py`](../../app.py) (Gradio on `app_port` /
+ Runs [`eval_redteam.py`](../../eval_redteam.py) twice (auth profile only):
+ 
+ 1. `LLM_FAMILY=qwen` — Qwen2.5-14B + Wagmi auth adapter (local `output/...` or Hub id from `config.py`).
+-2. `LLM_FAMILY=lfm2` — LFM2-8B-A1B + Wagmi LFM2 auth adapter.
++2. `LLM_FAMILY=lfm2` — [LiquidAI/LFM2-24B-A2B](https://huggingface.co/LiquidAI/LFM2-24B-A2B) + Wagmi LFM2 auth adapter (`config.py` `lfm2` / `auth`; TRL+PEFT load path).
+ 
+ Requires **CUDA** (e.g. L40 on the Space). Set `HF_TOKEN` if `FastLanguageModel.from_pretrained` must pull a private adapter.
+ 
+@@ -38,7 +38,7 @@ export MODEL_PROFILE=auth
+ python3 eval_redteam.py
+ ```
+ 
+-See [`eval_openai_compat.py`](../eval_openai_compat.py).
++See [`eval_openai_compat.py`](../../eval_openai_compat.py).
+ 
+ ## Dexm Next.js `/api/chat` smoke (garde-fous route + JSON refus)
+ 
+@@ -51,7 +51,7 @@ python3 scripts/redteam_dexm_chat_api_smoke.py --max-cases 8
+ 
+ Uses [`guardrail_checks.py`](../../guardrail_checks.py) (same assertions as `eval_redteam`). Streamed LLM replies are checked heuristically on the raw stream body (line-oriented UI protocol); JSON `action_refused` / `blocked` bodies are preferred for deterministic cases.
+ 
+-## Recurring runner (Phase 2)
++## Recurring runner
+ 
+ Use [`recurring_runner.py`](./recurring_runner.py) to orchestrate regular runs directly from the Space shell:
+ 

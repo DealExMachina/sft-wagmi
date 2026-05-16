@@ -96,7 +96,7 @@ LLM_FAMILY=lfm2 MODEL_PROFILE=auth python3 train.py
 
 **App:** [spaces/jeanbaptdzd/sft-wagmi](https://huggingface.co/spaces/jeanbaptdzd/sft-wagmi) (Gradio on port 7860). Git remote for pushes: `https://huggingface.co/spaces/jeanbaptdzd/sft-wagmi`. If the Space is **private**, unauthenticated HTTP checks return 401; open it while logged into Hugging Face.
 
-After a git push to the Space branch, use a **factory rebuild** (not only Restart) so the image includes the current tree and `/app/VERSION` matches [`VERSION`](VERSION). Verify with `cat /app/VERSION` over SSH or logs. Optional: `bash scripts/hf_space_self_check.sh` from repo root.
+After a git push to the Space branch, use a **factory rebuild** (not only Restart) so the image includes the current tree and `/app/VERSION` matches [`VERSION`](VERSION). Verify with `cat /app/VERSION` over SSH or logs. Optional: `bash scripts/hf_space_self_check.sh` from repo root. Shell runbook (recurring training, `hf jobs`, red-team helpers): [`scripts/hf/README.md`](scripts/hf/README.md).
 
 **LFM2 small (1.2B Instruct), sequential commands:**
 
@@ -200,7 +200,7 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
 ```text
 sft-wagmi/
 ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
-├── docs/                 HF model-card runbook (AI Act)
+├── docs/                 HF model-card runbook (AI Act); see also scripts/hf/README.md for Space ops
 ├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
 │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
 ├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py

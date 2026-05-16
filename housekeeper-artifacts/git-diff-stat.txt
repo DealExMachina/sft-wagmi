@@ -1,0 +1,5 @@
+ README.md                       |   4 +-
+ docs/RECURRING_TRAINING_PLAN.md | 123 ----------------------------------------
+ reports/redteam/README.md       |   2 +-
+ scripts/hf/README.md            |   6 +-
+ 4 files changed, 6 insertions(+), 129 deletions(-)

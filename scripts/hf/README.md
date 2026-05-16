@@ -19,7 +19,7 @@ The Space **Docker** image runs [`app.py`](../../app.py) (Gradio on `app_port` /
 Runs [`eval_redteam.py`](../../eval_redteam.py) twice (auth profile only):
 
 1. `LLM_FAMILY=qwen` — Qwen2.5-14B + Wagmi auth adapter (local `output/...` or Hub id from `config.py`).
-2. `LLM_FAMILY=lfm2` — LFM2-8B-A1B + Wagmi LFM2 auth adapter.
+2. `LLM_FAMILY=lfm2` — [LiquidAI/LFM2-24B-A2B](https://huggingface.co/LiquidAI/LFM2-24B-A2B) + Wagmi LFM2 auth adapter (`config.py` `lfm2` / `auth`; TRL+PEFT load path).
 
 Requires **CUDA** (e.g. L40 on the Space). Set `HF_TOKEN` if `FastLanguageModel.from_pretrained` must pull a private adapter.
 
@@ -38,7 +38,7 @@ export MODEL_PROFILE=auth
 python3 eval_redteam.py
 ```
 
-See [`eval_openai_compat.py`](../eval_openai_compat.py).
+See [`eval_openai_compat.py`](../../eval_openai_compat.py).
 
 ## Dexm Next.js `/api/chat` smoke (garde-fous route + JSON refus)
 
@@ -51,7 +51,7 @@ python3 scripts/redteam_dexm_chat_api_smoke.py --max-cases 8
 
 Uses [`guardrail_checks.py`](../../guardrail_checks.py) (same assertions as `eval_redteam`). Streamed LLM replies are checked heuristically on the raw stream body (line-oriented UI protocol); JSON `action_refused` / `blocked` bodies are preferred for deterministic cases.
 
-## Recurring runner (Phase 2)
+## Recurring runner
 
 Use [`recurring_runner.py`](./recurring_runner.py) to orchestrate regular runs directly from the Space shell:
 
