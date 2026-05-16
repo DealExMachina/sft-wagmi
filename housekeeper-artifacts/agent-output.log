@@ -1,0 +1,30 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area .
+
+Here is the housekeeping summary.
+
+### 1) Files changed
+
+| File | Action |
+|------|--------|
+| `docs/RECURRING_TRAINING_PLAN.md` | **Removed** |
+| `README.md` | **Updated** |
+| `scripts/hf/README.md` | **Updated** |
+| `reports/redteam/README.md` | **Updated** |
+
+### 2) Why each change was needed
+
+- **`docs/RECURRING_TRAINING_PLAN.md`** — It was an old design note (“add `recurring_runner.py`”, “add `configs/recurring_runs.json`”, etc.) while those pieces already exist and are documented in `scripts/hf/README.md`. It was not linked from anywhere in the repo, so it was safe to drop to avoid two conflicting sources of truth.
+
+- **`README.md`** — Tie the Hugging Face Space section to the real shell/`hf jobs`/recurring runbook (`scripts/hf/README.md`), and adjust the repo layout line so `docs/` is not described as only the model-card doc when Space operations live under `scripts/hf/`.
+
+- **`scripts/hf/README.md`** — Align the LFM2 auth red-team step with `config.py` (`LiquidAI/LFM2-24B-A2B`, not the outdated 8B wording). Fix the relative link to `eval_openai_compat.py` (it lives at repo root, not under `scripts/`). Rename “Recurring runner (Phase 2)” now that that phase is implemented.
+
+- **`reports/redteam/README.md`** — Fix the relative path to `scripts/hf/run_redteam_auth_l40.sh` (`../scripts/...` was wrong from `reports/redteam/`).
+
+### 3) Follow-up manual actions
+
+- **Bookmark / links:** Anything outside the repo that pointed at `docs/RECURRING_TRAINING_PLAN.md` should now use `scripts/hf/README.md` (and the main `README.md` Cursor SDK + Hugging Face sections).
+- **Historical CHANGELOG:** Older entries (e.g. `0.3.0` mentioning `LFM2-8B-A1B`) still describe that release; the live contract is `config.py`. No repo change was made there; update only if you want a retrospective note for readers.
+- **Red-team report files** under `reports/redteam/v0.3.5/` still record 8B models from those runs; that is expected historical output, not documentation.
