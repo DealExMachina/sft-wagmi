@@ -123,19 +123,21 @@ CURSOR_API_KEY=... npm run run:housekeeper
 CURSOR_API_KEY=... npm run run:housekeeper -- --area docs --instruction "focus on stale runbooks first"
 ```
 
-Recurring training orchestrator trigger:
+Recurring training orchestrator trigger (label your `--trigger` for logs; Actions uses `workflow_dispatch`: `.github/workflows/recurring-training-cursor-sdk.yml`):
 
 ```bash
 CURSOR_API_KEY=... npm run run:recurring -- --cadence daily --trigger scheduler
 CURSOR_API_KEY=... npm run run:recurring -- --cadence weekly --trigger scheduler
 ```
 
-Suggested cron shape (outside repo):
+Suggested cron shape (outside repo, HouseKeeper only):
 
 ```bash
 # nightly docs housekeeping
 0 2 * * * cd /path/to/sft-wagmi/automation/cursor-sdk && CURSOR_API_KEY=... npm run run:housekeeper -- --area .
 ```
+
+HF-side runner, MCP expectations, recurring job matrix, and `configs/recurring_runs.json`: [`scripts/hf/README.md`](scripts/hf/README.md).
 
 ## Autotune
 
@@ -200,7 +202,7 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
 ```text
 sft-wagmi/
 ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
-├── docs/                 HF model-card runbook (AI Act)
+├── docs/                 HF model-card runbook (`HF_MODEL_CARD_AI_ACT_RUNBOOK.md`)
 ├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
 │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
 ├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py

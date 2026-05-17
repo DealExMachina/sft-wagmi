@@ -20,8 +20,8 @@ npm install
     - update stale docs and README sections
     - remove clearly redundant documents
     - keep references consistent after edits/deletions
-- `npm run run:recurring -- --cadence daily|weekly`
-  - Triggers the existing recurring training runner through a Cursor agent.
+- `npm run run:recurring -- --cadence daily|weekly [--trigger <label>] [--config path/to/recurring.json]`
+  - Triggers the existing recurring training runner through a Cursor agent (defaults to `configs/recurring_runs.json`).
 
 ## HouseKeeper flags
 

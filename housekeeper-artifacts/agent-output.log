@@ -1,0 +1,26 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area .
+
+### 1) Files changed
+
+| File | Action |
+| --- | --- |
+| `README.md` | Modified |
+| `scripts/hf/README.md` | Modified |
+| `automation/cursor-sdk/README.md` | Modified |
+| `docs/RECURRING_TRAINING_PLAN.md` | **Deleted** |
+
+### 2) Why each change was needed
+
+| File | Reason |
+| --- | --- |
+| **`README.md`** | Clarify that `--trigger` is an arbitrary audit label; point readers to **`scripts/hf/README.md`** for HF runner layout, MCP vs `hf` CLI, recurring config (`configs/recurring_runs.json`). Label the housekeeping cron snippet as HouseKeeper-only. Refresh the **`docs/`** line in the repo layout now that recurring planning lives beside the runner docs, not under `docs/`. |
+| **`scripts/hf/README.md`** | Align **LFM2 auth** wording with **`config.py`** (current default **`LiquidAI/LFM2-24B-A2B`**, overridable via env), replacing stale **LFM2-8B-A1B** copy. Correct the inaccurate claim that **`recurring-training-cursor-sdk.yml`** is on a GitHub Actions **schedule**; it is **`workflow_dispatch`** only. |
+| **`automation/cursor-sdk/README.md`** | Match **`run-recurring.ts`** CLI: optional **`--trigger`** / **`--config`**, note default **`configs/recurring_runs.json`**. |
+| **`docs/RECURRING_TRAINING_PLAN.md`** | Obsolete phased plan (“immediate next steps” already shipped: `recurring_runner.py`, JSON config, `scripts/hf/README.md`, workflows). Removed to cut duplication with the operational readme; **no repo references** pointed at it after a search. |
+
+### 3) Follow-up manual actions
+
+- None required for correctness. Optional: update any **external** wiki or onboarding links that bookmarked **`docs/RECURRING_TRAINING_PLAN.md`** (none found in-repo).
+- **`reports/redteam/v0.3.5/*`** snapshots still cite older LFM checkpoints (historical artifacts; intentional to leave as-is unless you regenerate reports).

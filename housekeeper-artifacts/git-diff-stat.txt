@@ -1,0 +1,5 @@
+ README.md                       |   8 ++-
+ automation/cursor-sdk/README.md |   4 +-
+ docs/RECURRING_TRAINING_PLAN.md | 123 ----------------------------------------
+ scripts/hf/README.md            |   4 +-
+ 4 files changed, 9 insertions(+), 130 deletions(-)
