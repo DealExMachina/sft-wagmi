@@ -1,0 +1,5 @@
+ M README.md
+ M automation/cursor-sdk/README.md
+ D docs/RECURRING_TRAINING_PLAN.md
+ M scripts/hf/README.md
+?? housekeeper-artifacts/
