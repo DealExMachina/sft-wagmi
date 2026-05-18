@@ -1,0 +1,5 @@
+ README.md                       |   2 +
+ docs/RECURRING_TRAINING_PLAN.md | 123 ----------------------------------------
+ scripts/hf/README.md            |   2 +-
+ scripts/merge_next.py           |   4 +-
+ 4 files changed, 5 insertions(+), 126 deletions(-)

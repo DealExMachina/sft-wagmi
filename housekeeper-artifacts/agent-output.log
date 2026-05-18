@@ -1,0 +1,29 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area .
+
+Here is the housekeeping pass summary.
+
+## 1) Files changed
+
+| File | Change |
+|------|--------|
+| `docs/RECURRING_TRAINING_PLAN.md` | **Removed** (obsolete plan; deliverables already implemented and documented elsewhere). |
+| `README.md` | **Edited** — one sentence after the Cursor recurring SDK examples linking to [`scripts/hf/README.md`](scripts/hf/README.md) for matrices, HF Jobs, Space helpers, and red-team tooling. |
+| `scripts/hf/README.md` | **Edited** — LFM2 auth red-team bullet updated from `LFM2-8B-A1B` to **`LiquidAI/LFM2-24B-A2B`** to match `config.py` and the main README. |
+| `scripts/merge_next.py` | **Edited** — module docstring usage lines aligned with the real **`--bump` default (`minor`)** in `ArgumentParser` and `scripts/pipeline.py`. |
+
+## 2) Why each change was needed
+
+- **`RECURRING_TRAINING_PLAN.md` deletion:** It read as an active backlog (“implement orchestrator”, “add configs”, phased estimates) while `scripts/hf/recurring_runner.py`, `configs/recurring_runs.json`, and `scripts/hf/README.md` already describe the shipped design. Nothing in-repo linked to this file (`grep` found no references), so it duplicated and slightly contradicted the runbook-style doc.
+- **README bridge line:** Readers following only the Cursor SDK section had no obvious pointer to Space-side/matrix documentation; linking to `scripts/hf/README.md` keeps one canonical place for recurring training operations.
+- **`scripts/hf/README.md` model line:** Auth `lfm2` is **`LiquidAI/LFM2-24B-A2B`** in `config.py`; the old **8B** wording was misleading for anyone running `run_redteam_auth_l40.sh` on the Space.
+- **`merge_next.py` docstring:** The CLI default is **`minor`**, not `patch`; stale usage text could cause wrong semver expectations vs `pipeline.py`.
+
+## 3) Follow-up manual actions
+
+- **Outbound links:** If anything outside this repo (internal wiki, issues, Slack pins) referenced `docs/RECURRING_TRAINING_PLAN.md`, point those to **`scripts/hf/README.md`** (and **`configs/recurring_runs.json`** / **`.github/workflows/recurring-training-cursor-sdk.yml`** as needed).
+- **Review & commit:** You asked not to commit; when you’re ready, review the diff and commit in your usual process.
+- **Historical CHANGELOG:** Older entries still mention **`LFM2-8B-A1B`** for v0.3.0-era behavior; leave as history unless you want an explicit changelog addendum—not changed here.
+
+No destructive git commands were used; nothing was committed or pushed.

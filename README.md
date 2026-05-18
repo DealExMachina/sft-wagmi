@@ -130,6 +130,8 @@ CURSOR_API_KEY=... npm run run:recurring -- --cadence daily --trigger scheduler
 CURSOR_API_KEY=... npm run run:recurring -- --cadence weekly --trigger scheduler
 ```
 
+Matrix config, HF Jobs backend, Space-side helpers, and red-team scripts: [`scripts/hf/README.md`](scripts/hf/README.md).
+
 Suggested cron shape (outside repo):
 
 ```bash
