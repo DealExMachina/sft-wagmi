@@ -109,7 +109,7 @@ python3 eval_sft.py && python3 eval_sft_rag.py && python3 eval_redteam.py
 
 ## Cursor SDK recurring automations
 
-The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration.
+The repo includes Cursor SDK scripts in `automation/cursor-sdk` for recurring maintenance and recurring training orchestration. Space-side commands, HF Jobs, and `recurring_runner.py` are documented in [`scripts/hf/README.md`](scripts/hf/README.md).
 
 ```bash
 cd automation/cursor-sdk
