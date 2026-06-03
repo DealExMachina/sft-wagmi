@@ -1,15 +1,16 @@
 """One-command launcher for the sft-wagmi pipeline.
 
-Workflow:
-  1) optional dataset sync from dexm-one-page
-  2) optional merge data/next/ into training set (bump version)
-  3) baseline.py
-  4) train.py
-  5) autotune.py (requires OPENAI_API_KEY)
-  6) eval_sft.py / eval_sft_rag.py / eval_tool_calls.py
-  7) eval_redteam.py (versioned guardrail red-team report)
-  8) export_merged.py (push merged model to Hub)
-  9) local GGUF conversion (scripts/local_gguf_export.sh — manual)
+Steps are selected with explicit flags or with `--all`. Available steps:
+`preflight`, dataset `sync-dataset`, `merge-next` (bumps VERSION when
+`data/next/*.jsonl` exist), `baseline`, `train`, `autotune` (needs
+`OPENAI_API_KEY`), `eval`, `eval-rag`, `eval-tools`, `redteam`,
+`export-merged`, `export-gguf`.
+
+`--all` enables: preflight → merge-next → train → eval → eval-rag → redteam →
+export-merged. It does **not** run `sync-dataset`, `baseline`, `autotune`,
+`eval-tools`, or `export-gguf` unless those flags are added.
+
+Local GGUF after Hub export: `scripts/local_gguf_export.sh` (manual).
 
 Usage:
   python3 scripts/pipeline.py --all --profile auth

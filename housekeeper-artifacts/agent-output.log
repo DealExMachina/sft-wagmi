@@ -1,0 +1,28 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area .
+
+## 1) Files changed
+
+| File | Action |
+|------|--------|
+| `README.md` | Modified |
+| `scripts/pipeline.py` | Modified |
+| `eval_redteam.py` | Modified |
+| `scripts/hf/README.md` | Modified |
+| `automation/cursor-sdk/README.md` | Modified |
+| `docs/RECURRING_TRAINING_PLAN.md` | **Deleted** |
+
+## 2) Why each change was needed
+
+- **`docs/RECURRING_TRAINING_PLAN.md`** — Removed as obsolete: it described a future plan (orchestrator, config, templates) that is already implemented (`scripts/hf/recurring_runner.py`, `configs/recurring_runs.json`, `scripts/hf/README.md`). Nothing in the repo linked to this file.
+- **`README.md`** — Cut duplicated Cursor SDK/cron content in favor of one paragraph that points at `automation/cursor-sdk/README.md` and `scripts/hf/README.md`; documented `--eval-tools` and that it is not in `--all`; clarified `--all` merge behavior (step always runs; merge is a no-op when `data/next/` has no `.jsonl` files); listed skipped steps (`sync-dataset`, `eval-tools`) consistently; noted recurring ops under the repo layout line for `docs/`.
+- **`scripts/pipeline.py`** — Replaced the top-of-file docstring so it matches real argparse behavior and what `--all` actually runs (the old text still listed baseline/autotune in the default workflow).
+- **`scripts/hf/README.md`** — Updated the LFM2 auth red-team bullet to match `config.py`’s default base (`LiquidAI/LFM2-24B-A2B`) instead of the outdated 8B reference.
+- **`eval_redteam.py`** — Adjusted the inline comment to describe MoE LFM2 auth generically (still loads `BASE_MODEL_ID` from config) instead of hard-coding an old 8B ID.
+- **`automation/cursor-sdk/README.md`** — Added a single cross-link to `scripts/hf/README.md` so operational recurring-run documentation lives in one place without duplicating it in the root README.
+
+## 3) Follow-up manual actions
+
+- If anything **outside this git repo** (wikis, runbooks, bookmarks) still pointed at `docs/RECURRING_TRAINING_PLAN.md`, point it to **`scripts/hf/README.md`** instead.
+- Optional: update **`CHANGELOG.md`** in the next release note if you want the removal of the plan doc reflected for auditors who expected that path (not required for correctness).
