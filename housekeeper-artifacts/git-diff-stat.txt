@@ -1,0 +1,7 @@
+ README.md                       |  6 +--
+ automation/cursor-sdk/README.md |  2 +
+ docs/RECURRING_TRAINING_PLAN.md | 86 ++++++++++++++++-------------------------
+ eval_redteam.py                 |  4 +-
+ scripts/hf/README.md            |  2 +-
+ scripts/pipeline.py             | 18 ++++-----
+ 6 files changed, 49 insertions(+), 69 deletions(-)

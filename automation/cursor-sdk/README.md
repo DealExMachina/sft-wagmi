@@ -23,6 +23,8 @@ npm install
 - `npm run run:recurring -- --cadence daily|weekly`
   - Triggers the existing recurring training runner through a Cursor agent.
 
+Design reference (cadence, gates, risks): [`docs/RECURRING_TRAINING_PLAN.md`](../../docs/RECURRING_TRAINING_PLAN.md).
+
 ## HouseKeeper flags
 
 - `--area <path>`
