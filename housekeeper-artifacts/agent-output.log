@@ -1,0 +1,27 @@
+
+> run:housekeeper
+> tsx src/run-housekeeper.ts --area .
+
+Here is a concise summary of the housekeeper pass.
+
+### 1) Files changed
+
+| File | Change |
+|------|--------|
+| `README.md` | Cursor SDK section now points to `scripts/hf/README.md` and `docs/RECURRING_TRAINING_PLAN.md`; documents optional `--config`, clarifies `--trigger`; repository layout lists both docs under `docs/`. (The `--all` line already matched `pipeline.py`, including exclusion of `eval-tools`.) |
+| `scripts/hf/README.md` | LFM2 auth red-team step now matches `config.py`: `LiquidAI/LFM2-24B-A2B` instead of the outdated 8B line. |
+| `docs/RECURRING_TRAINING_PLAN.md` | Replaced the old “plan / TODO deliverables” text with a short design overview plus a table of **implemented** paths and a pointer to the operational runbook. |
+| `automation/cursor-sdk/README.md` | Documented `--trigger` and `--config` for `run:recurring`, aligned with `src/run-recurring.ts`. |
+| `reports/redteam/README.md` | Fixed broken relative link to `run_redteam_auth_l40.sh` (`../../scripts/hf/…`). |
+
+### 2) Why each change was needed
+
+- **README + `RECURRING_TRAINING_PLAN`:** The plan doc still read like future work (`scripts/hf/recurring_runner.py` and `configs/recurring_runs.json` are already in the tree). The README now splits **operations** vs **design** and avoids duplicating `scripts/hf/README.md`.
+- **`scripts/hf/README`:** Auth LFM2 base in production config is `LiquidAI/LFM2-24B-A2B`; the 8B line was stale for operators reading that section.
+- **`automation/cursor-sdk/README`:** The launcher supports `--config` and `--trigger`; docs now match the TypeScript CLI.
+- **`reports/redteam/README`:** The link resolved to `reports/scripts/...` and was incorrect from that folder.
+
+### 3) Follow-up manual actions
+
+- None required for these edits. Optional: run a scheduled/training workflow once to confirm `CURSOR_API_KEY` and `configs/recurring_runs.json` still match your Hub/Space setup.
+- Historical red-team artifacts under `reports/redteam/v0.3.5/` still mention older LFM2 checkpoint IDs; that is expected for dated snapshots—do not rewrite unless you explicitly want report history normalized.
