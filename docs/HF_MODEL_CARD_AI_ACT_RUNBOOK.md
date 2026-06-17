@@ -61,3 +61,8 @@ hf upload jeanbaptdzd/wagmi-qwen2.5-1.5b-sft output/hf-model-card-prep/cards/jea
 - Open each model page and confirm markdown rendering + YAML metadata.
 - Check model tags, pipeline tag, and license fields in the HF UI.
 - Keep local draft snapshots in the release artifact trail.
+
+## See also
+
+- Repository overview and compliance summary: [`README.md`](../README.md).
+- Hugging Face recurring training orchestration: [`scripts/hf/README.md`](../scripts/hf/README.md).
