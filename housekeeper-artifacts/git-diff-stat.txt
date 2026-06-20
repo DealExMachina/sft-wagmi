@@ -1,0 +1,6 @@
+ README.md                       |   4 +-
+ automation/cursor-sdk/README.md |   7 +-
+ docs/RECURRING_TRAINING_PLAN.md | 139 ++++++++++------------------------------
+ scripts/hf/README.md            |   2 +-
+ scripts/merge_next.py           |   4 +-
+ 5 files changed, 43 insertions(+), 113 deletions(-)

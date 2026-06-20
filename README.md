@@ -200,7 +200,7 @@ Outputs: `reports/redteam/v<version>/<profile>_redteam_<timestamp>.{json,md}` (r
 ```text
 sft-wagmi/
 ├── data/                 train.jsonl, eval.jsonl, metadata.json, tooling_email_calendar.jsonl, next/
-├── docs/                 HF model-card runbook (AI Act)
+├── docs/                 HF model-card runbook (AI Act); recurring-automation design notes
 ├── scripts/              pipeline.py, merge_next.py, export_ollama.py, local_gguf_export.sh,
 │                         prepare_hf_model_cards_ai_act.py, hf_space_self_check.sh, …
 ├── train.py, autotune.py, eval_*.py, export_*.py, baseline.py, retrain_step.py, app.py
@@ -227,7 +227,7 @@ Dataset, adapters, and merge artifacts: Deal ex Machina; distribution rules foll
 
 Wagmi in production is a limited-scope chatbot (EU AI Act transparency tier; not high-risk as deployed). Internal practices include versioned training, red-team reports, no user chats in SFT data, RAG + SFT + optional autotune for quality. **Gaps:** no standalone formal risk register; release-time testing only; finite red-team vectors; incomplete public model cards; inference subprocessors and geography not fully contractually closed (see deployment docs on dexm / Koyeb).
 
-AI Act model-card preparation workflow: [`docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md`](docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md) and `python3 scripts/prepare_hf_model_cards_ai_act.py`.
+AI Act model-card preparation workflow: [`docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md`](docs/HF_MODEL_CARD_AI_ACT_RUNBOOK.md) and `python3 scripts/prepare_hf_model_cards_ai_act.py`. Background on scheduled training orchestration: [`docs/RECURRING_TRAINING_PLAN.md`](docs/RECURRING_TRAINING_PLAN.md) (canonical ops: [`scripts/hf/README.md`](scripts/hf/README.md), [`configs/recurring_runs.json`](configs/recurring_runs.json)).
 
 **GDPR (summary):** chat is positioned as voluntary information; no training on user messages; limited persistence by product design. **Gaps:** no published DPIA; infrastructure logging and DPA coverage for inference hosts not fully documented; autotune code path must stay isolated from live user traffic.
 
