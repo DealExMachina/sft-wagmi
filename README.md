@@ -175,7 +175,7 @@ The downstream site ([dexm-one-page](https://github.com/DealExMachina/dexm-one-p
 | Profile | Site tier | Tools in production | Behavioural target |
 | --- | --- | --- | --- |
 | `small` | CPU / anonymous | **None** (enforced server-side) | Safety-first, factual, ~100 words, no tool JSON, point users to the on-page sign-in panel for auth. |
-| `auth` | GPU / authenticated | `auth-user`, `email.send` (connected user only), `calendar.create_event` (JB only) | Fuller DxM knowledge in concise paragraphs, structured tool-call examples where present, same safety floor. |
+| `auth` | GPU / authenticated | `auth-user`, `email.send` (connected user only), `calendar.create_event` (connected user + JB) | Fuller DxM knowledge in concise paragraphs, structured tool-call examples where present, same safety floor. |
 
 Retrain checklist when a prompt-philosophy change lands in dexm-one-page:
 

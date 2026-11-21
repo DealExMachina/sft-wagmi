@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "../dexm-one-page"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"typescript.tsdk": "node_modules/typescript/lib",
+		"typescript.enablePromptUseWorkspaceTsdk": true,
+		"files.associations": {
+			"*.js": "typescriptreact",
+			"*.jsx": "typescriptreact",
+			"*.ts": "typescript",
+			"*.tsx": "typescriptreact"
+		},
+		"postman.settings.dotenv-detection-notification-visibility": false
+	}
+}
